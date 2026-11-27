@@ -1,4 +1,4 @@
-import Appointment, { APPOINTMENT_STATES, AppointmentState, IAppointment } from '../models/appointment';
+import Appointment, { IAppointment } from '../models/appointment';
 import Schedule from '../models/Schedule';
 import { updateAvailabilitySchedule } from './scheduleService';
 import { AuthUser } from '../middlewares/auth';
@@ -21,110 +21,117 @@ export const getOwnedAppointment = async (appointmentId: string, user: AuthUser)
   return appointment;
 };
 
+/** Fecha y hora (UTC) de una franja: `day` con la hora `HH:mm` aplicada. */
+const scheduleDateTime = (day: Date, hour: string): Date => {
+  const [hours, minutes] = hour.split(':').map(Number);
+  const time = new Date(day);
+  time.setUTCHours(hours, minutes, 0, 0);
+  return time;
+};
+
 /**
- * El paciente sale del token y el psicólogo del propio horario: el cliente solo elige `scheduleId`.
+ * Reserva una franja. El paciente sale del token y el psicólogo de la propia franja:
+ * el cliente solo elige `scheduleId`. Los errores se lanzan como `AppError`.
  */
-export const scheduleAppointment = async ({ patientId, scheduleId }: { patientId: string; scheduleId: string }) => {
+export const scheduleAppointment = async ({ patientId, scheduleId }: { patientId: string; scheduleId: unknown }) => {
+  if (typeof scheduleId !== 'string' || scheduleId.trim() === '') {
+    throw new AppError(400, 'scheduleId es obligatorio');
+  }
+
   const schedule = await Schedule.findById(scheduleId);
   if (!schedule) {
-    return { error: "El horario no existe." };
+    throw new AppError(404, 'El horario no existe.');
   }
- if (!schedule.isAvailable) {
-    return { error: "Este horario ya está ocupado." };
-  }
-  // Separar la hora y los minutos
-  const [hours, minutes] = schedule.hour.split(":").map(Number);
-  console.log("🕒 Hora programada:", hours, minutes);
-
-  // Convertir `day` a UTC correctamente
-  const appointmentTime = new Date(schedule.day);
-  console.log("📅 Fecha programada (solo día):", appointmentTime);
-
-  // Usar `setUTCHours` para evitar problemas de zona horaria
-  appointmentTime.setUTCHours(hours, minutes, 0, 0);
-  console.log("📅 Fecha y hora programada en UTC:", appointmentTime);
-
-  // Validar que la fecha no esté en el pasado
-  const now = new Date();
-  if (appointmentTime < now) {
-    return { error: "No puedes agendar citas en fechas pasadas." };
+  if (!schedule.isAvailable) {
+    throw new AppError(409, 'Este horario ya está ocupado.');
   }
 
-  // Validar si el paciente ya tiene una cita en el mismo horario
+  const appointmentTime = scheduleDateTime(schedule.day, schedule.hour);
+  if (appointmentTime < new Date()) {
+    throw new AppError(400, 'No puedes agendar citas en fechas pasadas.');
+  }
+
+  // Las citas canceladas no cuentan: se puede volver a reservar a esa hora.
   const existingPatientAppointment = await Appointment.findOne({
     patientId,
     time: appointmentTime,
+    state: { $ne: 'cancelada' },
   });
-
   if (existingPatientAppointment) {
-    return { error: "Ya tienes una cita programada en este horario." };
+    throw new AppError(409, 'Ya tienes una cita programada en este horario.');
   }
 
-  // Crear la cita con la fecha y hora correcta en UTC
-  const appointment = await Appointment.create({
-    patientId,
-    psychologistId: schedule.psychologist,
-    scheduleId: schedule._id,
-    time: appointmentTime, // Fecha y hora en UTC
-    hour: schedule.hour, 
-    state: "pendiente",
-  });
+  // Reserva atómica: solo uno de dos pacientes simultáneos consigue marcar la franja como ocupada.
+  const claimed = await Schedule.findOneAndUpdate({ _id: schedule._id, isAvailable: true }, { isAvailable: false });
+  if (!claimed) {
+    throw new AppError(409, 'Este horario ya está ocupado.');
+  }
 
-  // Marcar el horario como ocupado
-  await Schedule.findByIdAndUpdate(schedule._id, { isAvailable: false });
-
-  return appointment;
+  try {
+    return await Appointment.create({
+      patientId,
+      psychologistId: schedule.psychologist,
+      scheduleId: schedule._id,
+      time: appointmentTime,
+      hour: schedule.hour,
+      state: 'pendiente',
+    });
+  } catch (error) {
+    await updateAvailabilitySchedule(String(schedule._id), true); // no dejar la franja bloqueada
+    throw error;
+  }
 };
 
-
-/** Campos de una cita que se pueden modificar desde la API. */
-const EDITABLE_APPOINTMENT_FIELDS = ['state'];
-
-export const updateAppointment = async (appointmentId: string, updateData: Record<string, unknown>, user: AuthUser) => {
-  const forbidden = Object.keys(updateData).filter((key) => !EDITABLE_APPOINTMENT_FIELDS.includes(key));
-  if (forbidden.length > 0) {
-    throw new AppError(403, `No puedes modificar: ${forbidden.join(', ')}`);
-  }
-  if ('state' in updateData && !APPOINTMENT_STATES.includes(updateData.state as AppointmentState)) {
-    throw new AppError(400, `state debe ser uno de: ${APPOINTMENT_STATES.join(', ')}`);
-  }
-
+/**
+ * Marca una cita pendiente como completada. Solo el psicólogo de la cita (o un administrador)
+ * y solo cuando la hora de la cita ya pasó.
+ */
+export const completeAppointment = async (appointmentId: string, user: AuthUser) => {
   const appointment = await getOwnedAppointment(appointmentId, user);
 
-  const currentTime = new Date();
-  const appointmentTime = new Date(appointment.time);
-  const timeDifference = appointmentTime.getTime() - currentTime.getTime();
-
-  if (timeDifference < 24 * 60 * 60 * 1000) {
-    throw new AppError(400, 'Solo puedes modificar la cita hasta 24 horas antes de la fecha programada.');
+  if (user.role !== 'administrador' && appointment.psychologistId.toString() !== user.id) {
+    throw new AppError(403, 'Solo el psicólogo de la cita puede marcarla como completada.');
+  }
+  if (appointment.state !== 'pendiente') {
+    throw new AppError(400, `La cita ya está ${appointment.state}.`);
+  }
+  if (appointment.time > new Date()) {
+    throw new AppError(400, 'No puedes completar una cita que todavía no ha ocurrido.');
   }
 
-  Object.assign(appointment, updateData);
+  appointment.state = 'completada';
   await appointment.save();
   return appointment;
 };
 
+/** Cancela una cita pendiente y libera su franja. */
 export const cancelAppointment = async (appointmentId: string, user: AuthUser) => {
-  await getOwnedAppointment(appointmentId, user);
+  const owned = await getOwnedAppointment(appointmentId, user);
 
-  const appointment = await Appointment.findByIdAndUpdate(
-    appointmentId,
-    { state: 'cancelled' },
-    { new: true }
+  // Condicionado a 'pendiente': cancelar dos veces no debe liberar una franja ya reservada de nuevo.
+  const appointment = await Appointment.findOneAndUpdate(
+    { _id: owned._id, state: 'pendiente' },
+    { state: 'cancelada' },
+    { new: true, runValidators: true }
   );
-
-  if (appointment) {
-    // Marcar el horario como disponible nuevamente
-    await updateAvailabilitySchedule(appointment.scheduleId.toString(), true);
+  if (!appointment) {
+    throw new AppError(400, `No se puede cancelar una cita ${owned.state}.`);
   }
 
+  await updateAvailabilitySchedule(appointment.scheduleId.toString(), true);
   return appointment;
 };
 
 export const getAppointmentsByPatient = async (patientId: string) => {
-  return await Appointment.find({ patientId }).populate('scheduleId psychologistId');
+  return Appointment.find({ patientId })
+    .sort({ time: 1 })
+    .populate('scheduleId')
+    .populate('psychologistId', 'name studies description');
 };
 
 export const getAppointmentsByPsychologist = async (psychologistId: string) => {
-  return await Appointment.find({ psychologistId }).populate('scheduleId patientId');
+  return Appointment.find({ psychologistId })
+    .sort({ time: 1 })
+    .populate('scheduleId')
+    .populate('patientId', 'name email');
 };

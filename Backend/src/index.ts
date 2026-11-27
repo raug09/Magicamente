@@ -3,11 +3,13 @@ import 'dotenv/config';
 import { createApp } from './app';
 import connectDB from './config/db';
 import { startCronJobs } from './config/cronJobs';
+import { runMigrations } from './config/migrations';
 import { assertRequiredEnv, getMongoUri, getPort } from './config/env';
 
 const main = async (): Promise<void> => {
   assertRequiredEnv();
   await connectDB(getMongoUri());
+  await runMigrations();
   startCronJobs();
 
   const port = getPort();
