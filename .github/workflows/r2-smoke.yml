@@ -10,6 +10,7 @@ on:
     paths:
       - 'Backend/scripts/r2-smoke.ts'
       - 'Backend/src/storage/**'
+      - 'Backend/src/config/env.ts'
       - '.github/workflows/r2-smoke.yml'
 
 jobs:

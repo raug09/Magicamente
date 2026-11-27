@@ -7,7 +7,7 @@
  *   2. que el enlace temporal lo abre y devuelve el mismo contenido,
  *   3. que el bucket NO es público (la misma dirección sin firma se rechaza),
  *   4. que se puede borrar y que después el enlace ya no funciona.
- * No imprime claves ni enlaces: solo el resultado de cada comprobación. Sale con código 1 si algo falla.
+ * No imprime claves, valores ni enlaces: solo el resultado de cada comprobación y si el formato de cada dato es correcto. Sale con código 1 si algo falla.
  */
 import crypto from 'crypto';
 import { getR2Config } from '../src/config/env';
@@ -16,6 +16,21 @@ import { R2Storage } from '../src/storage/r2Storage';
 const config = getR2Config();
 if (!config) {
   console.error('Faltan variables R2_* (R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET).');
+  process.exit(1);
+}
+
+// Diagnóstico del FORMATO de cada dato (nunca se imprimen los valores).
+const formats: Array<[string, boolean, string]> = [
+  ['R2_ACCOUNT_ID', /^[0-9a-f]{32}$/.test(config.accountId), 'debe tener 32 caracteres hexadecimales (0-9, a-f)'],
+  ['R2_ACCESS_KEY_ID', /^[0-9a-f]{32}$/.test(config.accessKeyId), 'suele tener 32 caracteres hexadecimales'],
+  ['R2_SECRET_ACCESS_KEY', /^[0-9a-f]{64}$/.test(config.secretAccessKey), 'suele tener 64 caracteres hexadecimales'],
+  ['R2_BUCKET', /^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$/.test(config.bucket), 'solo minúsculas, números y guiones (3 a 63)'],
+];
+for (const [name, valid, hint] of formats) {
+  console.log(`${valid ? 'OK ' : 'AVISO'} formato de ${name}${valid ? '' : `: ${hint}`}`);
+}
+if (!formats[0][1]) {
+  console.error('FALLO el id de cuenta no tiene el formato esperado: sin un id válido no se puede conectar con R2.');
   process.exit(1);
 }
 

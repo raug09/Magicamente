@@ -75,9 +75,22 @@ export interface R2Config {
   bucket: string;
 }
 
+/**
+ * El id de cuenta es el trozo de 32 caracteres de `https://<ID>.r2.cloudflarestorage.com`. Si alguien pega la
+ * dirección completa (o con comillas o barras) se extrae el id, para no fallar con un error de TLS poco claro.
+ */
+export const normalizeR2AccountId = (value: string): string =>
+  value
+    .trim()
+    .replace(/^["']|["']$/g, '')
+    .replace(/^https?:\/\//i, '')
+    .split(/[./:]/)[0]
+    .trim();
+
 /** Configuración de Cloudflare R2 para los documentos. Devuelve null si falta alguna variable. */
 export const getR2Config = (): R2Config | null => {
-  const accountId = process.env.R2_ACCOUNT_ID?.trim();
+  const rawAccountId = process.env.R2_ACCOUNT_ID?.trim();
+  const accountId = rawAccountId ? normalizeR2AccountId(rawAccountId) : undefined;
   const accessKeyId = process.env.R2_ACCESS_KEY_ID?.trim();
   const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY?.trim();
   const bucket = process.env.R2_BUCKET?.trim();

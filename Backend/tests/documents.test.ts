@@ -315,3 +315,30 @@ describe('utilidades de archivo y configuración', () => {
     }
   });
 });
+
+describe('normalización del id de cuenta de R2', () => {
+  it('acepta el id solo o la dirección completa del endpoint, con comillas o espacios', async () => {
+    const { normalizeR2AccountId } = await import('../src/config/env');
+    const id = '0123456789abcdef0123456789abcdef';
+    for (const value of [id, ` ${id} `, `"${id}"`, `https://${id}.r2.cloudflarestorage.com`, `https://${id}.r2.cloudflarestorage.com/`, `${id}.r2.cloudflarestorage.com`]) {
+      expect(normalizeR2AccountId(value)).toBe(id);
+    }
+  });
+
+  it('getR2Config usa el id ya normalizado', () => {
+    const saved = { ...process.env };
+    try {
+      const id = '0123456789abcdef0123456789abcdef';
+      Object.assign(process.env, {
+        R2_ACCOUNT_ID: `https://${id}.r2.cloudflarestorage.com`,
+        R2_ACCESS_KEY_ID: 'key',
+        R2_SECRET_ACCESS_KEY: 'secret',
+        R2_BUCKET: 'bucket',
+      });
+      expect(getR2Config()?.accountId).toBe(id);
+    } finally {
+      for (const name of ['R2_ACCOUNT_ID', 'R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY', 'R2_BUCKET']) delete process.env[name];
+      Object.assign(process.env, saved);
+    }
+  });
+});
