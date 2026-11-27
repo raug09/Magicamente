@@ -172,6 +172,8 @@ Cada endpoint declara su esquema en `validation/schemas.ts` y la ruta lo aplica 
 | `npm start` | Ejecuta `dist/index.js` |
 | `npm test` | Tests de integración (Vitest) |
 | `npm run typecheck` | Comprueba tipos de `src/` y `tests/` |
+| `npm run format` / `format:check` | Prettier: formatea / comprueba el formato (el CI usa `format:check`) |
+| `npm run openapi` | Regenera `docs/openapi.json` |
 
 ## Tests
 

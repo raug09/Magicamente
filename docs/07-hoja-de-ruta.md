@@ -52,7 +52,7 @@ Las referencias (S1, F2…) apuntan a [06 · Problemas conocidos](06-problemas-c
 
 ## Calidad y despliegue
 
-- [x] ESLint (en CI). Prettier: pendiente; aplicarlo de golpe reformatea todo el código, así que conviene hacerlo en un commit aparte.
+- [x] ESLint y Prettier, ambos comprobados en CI. El reformateo inicial está en un commit aparte que `git blame` ignora (`.git-blame-ignore-revs`).
 - [x] Documentación OpenAPI/Swagger: `/api/docs` y `docs/openapi.json`, generada desde las validaciones `zod`; un test exige que toda ruta esté documentada.
 
 ## ✅ Hecho: críticos (en curso de revisión)
