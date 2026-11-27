@@ -1,9 +1,31 @@
-import Appointment, { IAppointment } from '../models/appointment';
+import Appointment, { APPOINTMENT_STATES, AppointmentState, IAppointment } from '../models/appointment';
 import Schedule from '../models/Schedule';
 import { updateAvailabilitySchedule } from './scheduleService';
+import { AuthUser } from '../middlewares/auth';
+import { AppError } from '../utils/AppError';
 
-export const scheduleAppointment = async (appointmentData: IAppointment) => {
-  const schedule = await Schedule.findById(appointmentData.scheduleId);
+/**
+ * Devuelve la cita si quien la pide es su paciente, su psicólogo o un administrador.
+ * 404 si no existe, 403 si no le pertenece.
+ */
+export const getOwnedAppointment = async (appointmentId: string, user: AuthUser): Promise<IAppointment> => {
+  const appointment = await Appointment.findById(appointmentId);
+  if (!appointment) {
+    throw new AppError(404, 'La cita no existe.');
+  }
+  const isParticipant =
+    appointment.patientId.toString() === user.id || appointment.psychologistId.toString() === user.id;
+  if (user.role !== 'administrador' && !isParticipant) {
+    throw new AppError(403, 'No tienes permiso sobre esta cita.');
+  }
+  return appointment;
+};
+
+/**
+ * El paciente sale del token y el psicólogo del propio horario: el cliente solo elige `scheduleId`.
+ */
+export const scheduleAppointment = async ({ patientId, scheduleId }: { patientId: string; scheduleId: string }) => {
+  const schedule = await Schedule.findById(scheduleId);
   if (!schedule) {
     return { error: "El horario no existe." };
   }
@@ -30,7 +52,7 @@ export const scheduleAppointment = async (appointmentData: IAppointment) => {
 
   // Validar si el paciente ya tiene una cita en el mismo horario
   const existingPatientAppointment = await Appointment.findOne({
-    patientId: appointmentData.patientId,
+    patientId,
     time: appointmentTime,
   });
 
@@ -40,9 +62,9 @@ export const scheduleAppointment = async (appointmentData: IAppointment) => {
 
   // Crear la cita con la fecha y hora correcta en UTC
   const appointment = await Appointment.create({
-    patientId: appointmentData.patientId,
-    psychologistId: appointmentData.psychologistId,
-    scheduleId: appointmentData.scheduleId,
+    patientId,
+    psychologistId: schedule.psychologist,
+    scheduleId: schedule._id,
     time: appointmentTime, // Fecha y hora en UTC
     hour: schedule.hour, 
     state: "pendiente",
@@ -55,19 +77,26 @@ export const scheduleAppointment = async (appointmentData: IAppointment) => {
 };
 
 
-export const updateAppointment = async (appointmentId: string, updateData: Partial<{ time: Date; state: string }>) => {
-  const appointment = await Appointment.findById(appointmentId);
+/** Campos de una cita que se pueden modificar desde la API. */
+const EDITABLE_APPOINTMENT_FIELDS = ['state'];
 
-  if (!appointment) {
-    throw new Error('La cita no existe.');
+export const updateAppointment = async (appointmentId: string, updateData: Record<string, unknown>, user: AuthUser) => {
+  const forbidden = Object.keys(updateData).filter((key) => !EDITABLE_APPOINTMENT_FIELDS.includes(key));
+  if (forbidden.length > 0) {
+    throw new AppError(403, `No puedes modificar: ${forbidden.join(', ')}`);
   }
+  if ('state' in updateData && !APPOINTMENT_STATES.includes(updateData.state as AppointmentState)) {
+    throw new AppError(400, `state debe ser uno de: ${APPOINTMENT_STATES.join(', ')}`);
+  }
+
+  const appointment = await getOwnedAppointment(appointmentId, user);
 
   const currentTime = new Date();
   const appointmentTime = new Date(appointment.time);
   const timeDifference = appointmentTime.getTime() - currentTime.getTime();
 
   if (timeDifference < 24 * 60 * 60 * 1000) {
-    throw new Error('Solo puedes modificar la cita hasta 24 horas antes de la fecha programada.');
+    throw new AppError(400, 'Solo puedes modificar la cita hasta 24 horas antes de la fecha programada.');
   }
 
   Object.assign(appointment, updateData);
@@ -75,7 +104,9 @@ export const updateAppointment = async (appointmentId: string, updateData: Parti
   return appointment;
 };
 
-export const cancelAppointment = async (appointmentId: string) => {
+export const cancelAppointment = async (appointmentId: string, user: AuthUser) => {
+  await getOwnedAppointment(appointmentId, user);
+
   const appointment = await Appointment.findByIdAndUpdate(
     appointmentId,
     { state: 'cancelled' },

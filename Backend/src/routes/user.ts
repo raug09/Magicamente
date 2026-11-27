@@ -1,19 +1,18 @@
 import { Router } from 'express';
-import { isAuthenticated, isAdmin } from '../middlewares/auth';
+import { isAuthenticated, isAdmin, isSelfOrAdmin } from '../middlewares/auth';
+import { asyncHandler } from '../middlewares/asyncHandler';
 import { getUser, updateUser, deleteUser, listUsers } from '../controllers/userController';
 
 const router = Router();
 
-// Obtener usuario (solo autenticado)
-router.get('/:id', isAuthenticated, getUser);
+// Solo administradores: listar todos los usuarios.
+router.get('/', isAuthenticated, isAdmin, asyncHandler(listUsers));
 
-// Actualizar usuario (solo el propio o administrador, la lógica de validación se puede hacer dentro del controlador)
-router.put('/:id', isAuthenticated, updateUser);
+// Perfil completo propio (o admin); de otros, solo el perfil público si es psicólogo.
+router.get('/:id', isAuthenticated, asyncHandler(getUser));
 
-// Eliminar usuario (solo el propio o administrador)
-router.delete('/:id', isAuthenticated, deleteUser);
-
-// Ruta para que el administrador liste todos los usuarios
-router.get('/', isAuthenticated, isAdmin, listUsers);
+// Solo la propia cuenta o un administrador.
+router.put('/:id', isAuthenticated, isSelfOrAdmin(), asyncHandler(updateUser));
+router.delete('/:id', isAuthenticated, isSelfOrAdmin(), asyncHandler(deleteUser));
 
 export default router;

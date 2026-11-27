@@ -1,19 +1,32 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
+import { getJwtSecret } from '../config/env';
 
-// Extender la interfaz de Request para incluir la propiedad "user"
-export interface AuthenticatedRequest extends Request {
-  user?: {
-    id: string;
-    role: 'paciente' | 'psicologo' | 'administrador';
-  };
+export const ROLES = ['paciente', 'psicologo', 'administrador'] as const;
+export type Role = (typeof ROLES)[number];
+
+export interface AuthUser {
+  id: string;
+  role: Role;
 }
 
+// Añade `req.user` al tipo Request de Express.
+declare global {
+  // eslint-disable-next-line @typescript-eslint/no-namespace
+  namespace Express {
+    interface Request {
+      user?: AuthUser;
+    }
+  }
+}
+
+/** Mantengo el nombre anterior por compatibilidad. */
+export type AuthenticatedRequest = Request;
+
 /**
- * Middleware para verificar que la solicitud tenga un token JWT válido.
- * Se espera que el token se envíe en el header "Authorization" con el formato "Bearer <token>".
+ * Verifica el JWT enviado en "Authorization: Bearer <token>" y deja el usuario en `req.user`.
  */
-export const isAuthenticated = (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
+export const isAuthenticated = (req: Request, res: Response, next: NextFunction): void => {
   const authHeader = req.headers.authorization;
 
   if (!authHeader) {
@@ -21,32 +34,42 @@ export const isAuthenticated = (req: AuthenticatedRequest, res: Response, next: 
     return;
   }
 
-  // Se espera el formato "Bearer token"
-  const token = authHeader.split(' ')[1];
-  if (!token) {
+  const [scheme, token] = authHeader.split(' ');
+  if (scheme !== 'Bearer' || !token) {
     res.status(401).json({ message: 'Token inválido o mal formado' });
     return;
   }
 
   try {
-    // Verifica el token. Asegúrate de tener configurada la variable de entorno JWT_SECRET.
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret') as { id: string; role: 'paciente' | 'psicologo' | 'administrador' };
-    // Agregar la información decodificada a la request para uso posterior.
-    req.user = decoded;
+    const decoded = jwt.verify(token, getJwtSecret()) as AuthUser;
+    req.user = { id: String(decoded.id), role: decoded.role };
     next();
-  } catch (error) {
+  } catch {
     res.status(401).json({ message: 'Token no válido' });
   }
 };
 
-/**
- * Middleware para verificar que el usuario autenticado tenga rol de "administrador".
- * Este middleware asume que `isAuthenticated` ya se ejecutó y que `req.user` está definido.
- */
-export const isAdmin = (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
-  if (!req.user || req.user.role !== 'administrador') {
-    res.status(403).json({ message: 'Acceso denegado: se requiere rol de administrador' });
-    return;
-  }
-  next();
-};
+/** Permite el paso solo a los roles indicados. Requiere `isAuthenticated` antes. */
+export const requireRole =
+  (...roles: Role[]) =>
+  (req: Request, res: Response, next: NextFunction): void => {
+    if (!req.user || !roles.includes(req.user.role)) {
+      res.status(403).json({ message: `Acceso denegado: se requiere rol ${roles.join(' o ')}` });
+      return;
+    }
+    next();
+  };
+
+export const isAdmin = requireRole('administrador');
+
+/** Permite el paso si `req.params[param]` es el propio usuario o si es administrador. */
+export const isSelfOrAdmin =
+  (param = 'id') =>
+  (req: Request, res: Response, next: NextFunction): void => {
+    const user = req.user;
+    if (!user || (user.role !== 'administrador' && user.id !== req.params[param])) {
+      res.status(403).json({ message: 'Acceso denegado: solo puedes gestionar tu propia cuenta' });
+      return;
+    }
+    next();
+  };

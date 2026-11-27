@@ -1,61 +1,61 @@
-import User, { IUser } from '../models/User';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
-import { sendEmail } from "../services/emailService";
+import User, { IUser } from '../models/User';
+import { sendEmail } from './emailService';
+import { getJwtSecret } from '../config/env';
+import { AppError } from '../utils/AppError';
+import { Role } from '../middlewares/auth';
 
-export const registerService = async (name: string, email: string, password: string, role: string, studies: string[]): Promise<IUser> => {
-  
-    
-  // Verificar si el usuario ya existe
-  const existingUser = await User.findOne({ email });
-  if (existingUser) {
-    throw new Error('El email ya está en uso');
+/** Roles que se pueden elegir en el registro público. Los administradores se crean aparte. */
+export const SELF_REGISTER_ROLES: Role[] = ['paciente', 'psicologo'];
+
+export const hashPassword = async (password: string): Promise<string> => {
+  const salt = await bcrypt.genSalt(10);
+  return bcrypt.hash(password, salt);
+};
+
+export interface RegisterInput {
+  name: string;
+  email: string;
+  password: string;
+  role?: Role;
+  studies?: string[];
+}
+
+export const registerService = async ({ name, email, password, role = 'paciente', studies }: RegisterInput): Promise<IUser> => {
+  if (!SELF_REGISTER_ROLES.includes(role)) {
+    throw new AppError(400, `Rol no permitido en el registro. Usa: ${SELF_REGISTER_ROLES.join(', ')}`);
   }
 
-  // Encriptar la contraseña
-  const salt = await bcrypt.genSalt(10);
-  const hashedPassword = await bcrypt.hash(password, salt);
+  const existingUser = await User.findOne({ email });
+  if (existingUser) {
+    throw new AppError(409, 'El email ya está en uso');
+  }
 
-  // Crear el usuario con rol "paciente" por defecto
-  const newUser: IUser = new User({
+  const newUser = new User({
     name,
     email,
-    password: hashedPassword,
+    password: await hashPassword(password),
     role,
     studies,
   });
-
   await newUser.save();
-  
+
   try {
-    await sendEmail("confirmation", email, name);
+    await sendEmail('confirmation', email, name);
   } catch (error) {
-    console.error("Error al enviar email de confirmación:", error);
-    // No hacemos throw aquí porque ya guardamos el usuario
+    // El usuario ya está guardado: un fallo de correo no debe romper el registro.
+    console.error('Error al enviar email de confirmación:', error);
   }
-  
+
   return newUser;
 };
 
 export const loginService = async (email: string, password: string): Promise<string> => {
-  // Buscar el usuario por email
   const user = await User.findOne({ email });
-  if (!user) {
-    throw new Error('Credenciales inválidas');
+  if (!user || !(await bcrypt.compare(password, user.password))) {
+    throw new AppError(401, 'Credenciales inválidas');
   }
 
-  // Verificar la contraseña
-  const isMatch = await bcrypt.compare(password, user.password);
-  if (!isMatch) {
-    throw new Error('Credenciales inválidas');
-  }
-
-  // Generar el token JWT
-  const token = jwt.sign(
-    { id: user._id, role: user.role },
-    process.env.JWT_SECRET || 'secret',
-    { expiresIn: '1h' }
-  );
-
-  return token;
+  return jwt.sign({ id: user._id, role: user.role }, getJwtSecret(), { expiresIn: '1h' });
 };

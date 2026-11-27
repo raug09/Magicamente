@@ -1,42 +1,22 @@
-import express from 'express';
-import cors from 'cors';
-import dotenv from 'dotenv';
+// Debe ser la primera línea: carga Backend/.env antes que cualquier otro módulo.
+import 'dotenv/config';
+import { createApp } from './app';
 import connectDB from './config/db';
-import authRoutes from './routes/auth';
-import userRoutes from './routes/user';
-import appointmentRoutes from './routes/appointment';
-import scheduleRoutes from './routes/schedule';
-import notificationRoutes from './routes/notification';
-import emailRoutes from "./routes/emailRoutes";
-import "./config/cronJobs";
+import { startCronJobs } from './config/cronJobs';
+import { assertRequiredEnv, getMongoUri, getPort } from './config/env';
 
+const main = async (): Promise<void> => {
+  assertRequiredEnv();
+  await connectDB(getMongoUri());
+  startCronJobs();
 
+  const port = getPort();
+  createApp().listen(port, () => {
+    console.log(`Servidor escuchando en el puerto ${port}`);
+  });
+};
 
-dotenv.config();
-
-const app = express();
-const PORT = process.env.PORT || 3000;
-
-// Middlewares
-app.use(cors());
-app.use(express.json());
-
-// Conectar a la base de datos
-connectDB();
-
-app.use('/api/auth', authRoutes);
-app.use('/api/users', userRoutes);
-app.use('/api/appointments', appointmentRoutes);
-app.use('/api/schedule', scheduleRoutes);
-app.use('/api/notifications', notificationRoutes);
-app.use("/api/email", emailRoutes);
-
-
-app.get('/', (req, res) => {
-  res.send('Servidor corriendo y conectado a MongoDB');
-});
-
-// Iniciar el servidor
-app.listen(PORT, () => {
-  console.log(`Servidor escuchando en el puerto ${PORT}`);
+main().catch((error) => {
+  console.error('No se pudo iniciar el servidor:', error instanceof Error ? error.message : error);
+  process.exit(1);
 });

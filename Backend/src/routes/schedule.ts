@@ -1,15 +1,14 @@
-// routes/schedule.ts
 import { Router } from 'express';
 import { createSchedule, getSchedulesByPsychologist } from '../controllers/scheduleController';
-import { isAuthenticated } from '../middlewares/auth';
-
+import { isAuthenticated, requireRole } from '../middlewares/auth';
+import { asyncHandler } from '../middlewares/asyncHandler';
 
 const router = Router();
 
-// Crear un horario (POST /api/schedule)
-router.post('/', isAuthenticated, createSchedule);
+// Crear una franja: solo psicólogos (para sí mismos) o administradores.
+router.post('/', isAuthenticated, requireRole('psicologo', 'administrador'), asyncHandler(createSchedule));
 
-// Obtener todos los horarios de un psicólogo (GET /api/schedule/:psychologistId)
-router.get('/:psychologistId', isAuthenticated, getSchedulesByPsychologist);
+// Franjas de un psicólogo: cualquier usuario autenticado.
+router.get('/:psychologistId', isAuthenticated, asyncHandler(getSchedulesByPsychologist));
 
 export default router;
