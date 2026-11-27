@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import mongoose from 'mongoose';
 import Appointment from '../src/models/appointment';
+import Schedule from '../src/models/Schedule';
+import User from '../src/models/User';
 import { runMigrations } from '../src/config/migrations';
 
 describe('migraciones', () => {
@@ -32,5 +34,23 @@ describe('migraciones', () => {
     const scheduleIndex = indexes.find((i) => i.name === 'scheduleId_1');
     expect(scheduleIndex?.unique).toBe(true);
     expect(scheduleIndex?.partialFilterExpression).toBeTruthy();
+  });
+
+  it('completa franjas antiguas con startsAt (día + hora en UTC) y timezone', async () => {
+    const id = new mongoose.Types.ObjectId();
+    await Schedule.collection.insertOne({ psychologist: id, day: new Date('2026-12-15'), hour: '10:30', isAvailable: true, recurrent: false });
+
+    await runMigrations();
+    await runMigrations();
+
+    const migrated = await Schedule.findOne({ psychologist: id });
+    expect(migrated?.startsAt.toISOString()).toBe('2026-12-15T10:30:00.000Z');
+    expect(migrated?.timezone).toBe('UTC');
+  });
+
+  it('da zona horaria a los usuarios antiguos', async () => {
+    await User.collection.insertOne({ name: 'Antiguo', email: 'antiguo@example.com', password: 'x', role: 'paciente' });
+    await runMigrations();
+    expect((await User.findOne({ email: 'antiguo@example.com' }))?.timezone).toBe('UTC');
   });
 });

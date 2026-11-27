@@ -72,8 +72,8 @@ El registro público solo permite `paciente` o `psicologo`. El primer administra
 ### Registro / login
 
 ```http
-POST /api/auth/register   { "name", "email", "password", "role"?: "paciente"|"psicologo", "studies"?: ["…"] }
-→ 201 { "message": "Usuario registrado correctamente", "token": "…", "user": { "_id", "name", "email", "role", … } }
+POST /api/auth/register   { "name", "email", "password", "role"?: "paciente"|"psicologo", "studies"?: ["…"], "timezone"?: "America/Bogota" }
+→ 201 { "message": "Usuario registrado correctamente", "token": "…", "user": { "_id", "name", "email", "role", "timezone", … } }
 → 400 (campo ausente, rol no permitido, contraseña débil) · 409 (email ya usado)
 
 POST /api/auth/login      { "email", "password" }
@@ -106,8 +106,10 @@ GET /api/psychologists?q=ana&page=1&limit=20
 
 GET /api/schedule/:psychologistId?available=true&from=2026-12-01&to=2026-12-31
 → 200 [ { "_id", "psychologist", "day": "2026-12-15T00:00:00.000Z", "hour": "10:00",
-          "isAvailable": true, "recurrent": false, "createdAt" } ]
-   (ordenadas por día y hora; available=true = libres y futuras)
+          "timezone": "America/Bogota", "startsAt": "2026-12-15T15:00:00.000Z",
+          "isAvailable": true, "createdAt" } ]
+   (ordenadas por startsAt; available=true = libres y que aún no han empezado;
+    from/to se refieren al día del calendario del psicólogo, formato YYYY-MM-DD)
 
 POST /api/appointments/appointment   { "scheduleId" }
 → 201 { "message": "Cita agendada correctamente", "appointment": { "_id", "patientId", "psychologistId",
@@ -141,14 +143,13 @@ Estados de una cita: `pendiente` → `cancelada` (cancelar) o `completada` (psic
 ### Psicólogo: agenda
 
 ```http
-POST   /api/schedule        { "day": "2026-12-15", "hour": "10:00" }       → 201 { "message", "schedule" }
+POST   /api/schedule        { "day": "2026-12-15", "hour": "10:00", "repeatWeeks"?: 1–26 }  → 201 { "message", "schedules", "skipped" }
 PUT    /api/schedule/:id    { "day"?: "…", "hour"?: "…" }                   → 200 { "message", "schedule" }
 DELETE /api/schedule/:id                                                    → 200 { "message" }
 GET    /api/schedule/:miId  (sin filtros = todas, incluidas ocupadas y pasadas)
 ```
 
-- `day` debe ser **posterior a ahora** (a medianoche UTC): no se puede crear una franja para el día de hoy.
-- `hour` con formato `HH:mm` (24 h).
+- `day` con formato **`YYYY-MM-DD`** (fecha real) y `hour` con formato `HH:mm` (24 h), ambos en la zona horaria del psicólogo (§6). La franja debe empezar en el futuro.
 - `409` al crear/mover si ya existe una franja igual, y **al editar/borrar una franja con cita reservada** (el psicólogo debe cancelar antes la cita).
 - Un psicólogo no puede crear franjas para otro (403); un administrador sí, indicando `"psychologist": "<id>"`.
 
@@ -161,7 +162,7 @@ GET /api/users/:id
 → otro caso: 404
 
 PUT /api/users/:id   (solo tú mismo o un admin)
-   puedes cambiar: name, description, studies (lista de textos), password
+   puedes cambiar: name, description, studies (lista de textos), password, timezone
    un admin además: email, role, isActive
    cualquier otro campo → 403
 ```
@@ -177,17 +178,56 @@ Cambiar la contraseña desde el perfil **cierra la sesión actual** (vuelve a pe
 - No se puede eliminar al **último administrador**: responde `409` (“No puedes eliminar al último administrador”).
 - Tras eliminar la propia cuenta, el frontend debe borrar el token y volver a login (cualquier petición posterior da `401`).
 
-## 6. Fechas y zonas horarias ⚠️
+## 6. Fechas y zonas horarias
 
-El backend trabaja **todo en UTC** y, por ahora, no conoce la zona horaria del usuario:
+**Regla de oro: el backend guarda y devuelve instantes reales (UTC, formato ISO con `Z`). El frontend los convierte a la zona del usuario para mostrarlos.** Cada usuario tiene una `timezone` (nombre IANA, p. ej. `"America/Bogota"`, `"Europe/Madrid"`; por defecto `"UTC"`).
 
-- `day` es una fecha a medianoche UTC (`"2026-12-15T00:00:00.000Z"`).
-- `hour` (`"10:00"`) se interpreta como **hora UTC**. La cita real empieza en `day + hour` UTC; el campo `time` de la cita ya trae ese instante calculado.
-- Para **mostrar** en hora local: `new Date(appointment.time)` y `toLocaleString(...)` (usa `time`, no `day` + `hour` sueltos).
-- Para **crear** una franja a las 10:00 locales hay que convertir a UTC antes de enviar `hour` (y cuidado si al convertir cambia el día).
-- Mientras no se decida otra cosa, una opción segura es mostrar y pedir las horas **etiquetadas como UTC**.
+### Qué campos usar para mostrar
 
-Es una decisión pendiente de producto (ver §9) que afecta tanto al backend como al frontend.
+| Dato | Campo fiable | Cómo mostrarlo |
+|---|---|---|
+| Cuándo empieza una franja | `startsAt` (ISO UTC) | `new Date(s.startsAt)` → formatear con la zona del usuario que mira |
+| Cuándo es una cita | `time` (ISO UTC) | igual |
+| Hora “de pared” del psicólogo | `hour` + `timezone` de la franja | Solo informativa: “10:00 (America/Bogota)” |
+
+**No uses `day` + `hour` para calcular instantes**: `day` es el día del calendario *del psicólogo* a medianoche UTC (`"2026-12-15T00:00:00.000Z"` significa “15 de diciembre”, no un instante) y `hour` es su hora local. El instante real es siempre `startsAt`.
+
+```ts
+// Mostrar en la zona del usuario que mira (p. ej. user.timezone de /auth/me)
+new Intl.DateTimeFormat('es', { timeZone: me.timezone, dateStyle: 'full', timeStyle: 'short' })
+  .format(new Date(slot.startsAt));
+```
+
+### Qué enviar al crear o mover una franja
+
+`POST /api/schedule` y `PUT /api/schedule/:id` reciben el `day` (`"YYYY-MM-DD"`) y la `hour` (`"HH:mm"`) **tal como los ve el psicólogo, en su propia zona** — el servidor los convierte a UTC con su `timezone` guardada (incluido el horario de verano). El frontend **no convierte nada**: simplemente muestra al psicólogo “Tu zona horaria: X” y le deja elegir día y hora locales. Si el psicólogo cambia de zona (`PUT /api/users/:id { timezone }`), las franjas ya creadas **no se mueven** (su `startsAt` sigue siendo el mismo instante real).
+
+- Si la hora pedida **no existe** por el cambio de hora (p. ej. 02:30 el día que el reloj salta de 02:00 a 03:00), responde `400` con el motivo: muéstralo.
+- Si existe dos veces (el reloj retrocede), se usa la primera.
+
+### Zona horaria del usuario
+
+- Al **registrarse**, envía `timezone` con la del navegador: `Intl.DateTimeFormat().resolvedOptions().timeZone`. Es opcional (sin ella, `"UTC"`) y se valida (`400` si no es válida).
+- `GET /api/auth/me` la devuelve. Se cambia con `PUT /api/users/:id { "timezone": "Europe/Madrid" }`. Ofrece un selector en el perfil.
+- Los **correos** (recordatorios y avisos de cancelación) usan la zona del destinatario.
+
+### Franjas recurrentes
+
+`POST /api/schedule` acepta `"repeatWeeks": N` (entero de 1 a 26): crea esa franja y las N−1 siguientes, **una por semana, siempre a la misma hora local** aunque cambie el horario de verano.
+
+```http
+POST /api/schedule  { "day": "2026-12-15", "hour": "10:00", "repeatWeeks": 8 }
+→ 201 { "message": "Horario creado exitosamente",
+        "schedules": [ { "_id", "day", "hour", "timezone", "startsAt", "isAvailable", … }, … ],
+        "skipped": ["2027-01-05"] }          ← días que ya existían (no se duplican)
+→ 409 si ya existían todas · 400 si repeatWeeks no es un entero de 1 a 26, o alguna cae en un cambio de hora inexistente (no se crea ninguna)
+```
+
+⚠️ **La respuesta de crear franja cambió**: ahora es siempre `schedules` (una lista, aunque sea de una) y `skipped`. Ya no existe `schedule` en singular al crear (`PUT` sí devuelve `schedule`). Cada franja de una serie es **independiente**: se borra o mueve por separado; no hay un “borrar toda la serie”.
+
+### Día de hoy
+
+Ya se pueden crear franjas para **hoy** (en el calendario del psicólogo) siempre que su hora no haya empezado. Una franja ya empezada nunca se puede reservar: `GET /schedule/:id?available=true` ya la excluye.
 
 ## 7. Detalles que conviene saber
 
@@ -214,7 +254,6 @@ npm install && npm run dev             # http://localhost:3000
 
 ### Backend que facilitaría el frontend (por orden de utilidad)
 
-- [ ] **Decisión de zonas horarias** (campo `timezone` por usuario o convertir en el servidor) — §6.
 - [ ] Paginación en “mis citas”.
 - [ ] Documentación OpenAPI/Swagger generada (así el frontend puede generar sus tipos automáticamente).
 
@@ -224,5 +263,5 @@ npm install && npm run dev             # http://localhost:3000
 - [ ] Cliente HTTP con cabecera `Authorization`, manejo global de `401` (→ login) y de `429` (`Retry-After`).
 - [ ] Pantallas de §4, empezando por registro/login → listado de psicólogos → reserva → mis citas.
 - [ ] Ruta `/reset-password` que lea `token` de la URL.
-- [ ] Decidir cómo mostrar fechas y horas (§6).
+- [ ] Mostrar fechas con `startsAt`/`time` y `Intl.DateTimeFormat` (§6); selector de zona horaria en el perfil.
 - [ ] Tests (por ejemplo, Vitest + Testing Library) y un job de CI para el frontend en `.github/workflows/`.

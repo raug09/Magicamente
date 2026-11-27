@@ -1,4 +1,6 @@
 import { Schema, model, Document, Types } from 'mongoose';
+import { getAppTimezone } from '../config/env';
+import { isValidTimeZone } from '../utils/timezone';
 
 export interface IUser extends Document {
   name: string;
@@ -17,6 +19,8 @@ export interface IUser extends Document {
   passwordChangedAt?: Date;
   /** Fecha en que se eliminó la cuenta. Los datos personales se anonimizan, pero el registro se conserva. */
   deletedAt?: Date;
+  /** Zona horaria IANA del usuario (p. ej. "America/Bogota"): define cómo se ven y se crean sus horas. */
+  timezone?: string;
 }
 
 const UserSchema = new Schema<IUser>({
@@ -33,6 +37,7 @@ const UserSchema = new Schema<IUser>({
   passwordResetExpires: { type: Date, select: false },
   passwordChangedAt: { type: Date, select: false },
   deletedAt: { type: Date },
+  timezone: { type: String, default: () => getAppTimezone(), validate: { validator: isValidTimeZone, message: 'Zona horaria no válida' } },
 });
 
 export default model<IUser>('User', UserSchema);

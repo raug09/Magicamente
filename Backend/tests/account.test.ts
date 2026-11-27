@@ -179,3 +179,38 @@ describe('reservar con un psicólogo que ya no está disponible', () => {
     expect((await Schedule.findById(schedule._id))?.isAvailable).toBe(true);
   });
 });
+
+describe('zona horaria del usuario', () => {
+  it('se puede indicar al registrarse y aparece en /auth/me', async () => {
+    const res = await request(app)
+      .post('/api/auth/register')
+      .send({ name: 'Luis', email: 'luis@example.com', password: 'secreto123', timezone: 'America/Bogota' });
+    expect(res.status).toBe(201);
+    expect(res.body.user.timezone).toBe('America/Bogota');
+
+    const me = await request(app).get('/api/auth/me').set({ Authorization: `Bearer ${res.body.token}` });
+    expect(me.body.timezone).toBe('America/Bogota');
+  });
+
+  it('por defecto es UTC y una zona inválida se rechaza al registrarse', async () => {
+    const ok = await request(app).post('/api/auth/register').send({ name: 'A', email: 'a@example.com', password: 'secreto123' });
+    expect(ok.body.user.timezone).toBe('UTC');
+
+    const bad = await request(app)
+      .post('/api/auth/register')
+      .send({ name: 'B', email: 'b@example.com', password: 'secreto123', timezone: 'Marte/Olympus' });
+    expect(bad.status).toBe(400);
+  });
+
+  it('cada uno puede cambiar la suya, y se valida', async () => {
+    const user = await createUser('paciente');
+    const put = (timezone: unknown) => request(app).put(`/api/users/${user.id}`).set(auth(user)).send({ timezone });
+
+    const ok = await put('Europe/Madrid');
+    expect(ok.status).toBe(200);
+    expect(ok.body.timezone).toBe('Europe/Madrid');
+    expect((await put('Marte/Olympus')).status).toBe(400);
+    expect((await put(5)).status).toBe(400);
+    expect((await User.findById(user.id))?.timezone).toBe('Europe/Madrid');
+  });
+});

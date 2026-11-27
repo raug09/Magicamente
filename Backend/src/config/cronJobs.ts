@@ -35,7 +35,7 @@ export const sendAppointmentReminders = async (now = new Date()): Promise<number
         console.warn(`[recordatorios] Paciente ${appointment.patientId} no encontrado (cita ${_id})`);
         continue;
       }
-      const { date, hour } = formatAppointmentDate(appointment.time);
+      const { date, hour } = formatAppointmentDate(appointment.time, patient.timezone);
       await sendEmail('appointmentReminder', patient.email, patient.name, date, hour);
       sent++;
     } catch (error) {

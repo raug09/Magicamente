@@ -6,7 +6,7 @@ import { AppError } from '../utils/AppError';
 const isNonEmptyString = (value: unknown): value is string => typeof value === 'string' && value.trim() !== '';
 
 export const register = async (req: Request, res: Response) => {
-  const { name, email, password, role, studies } = req.body ?? {};
+  const { name, email, password, role, studies, timezone } = req.body ?? {};
 
   if (!isNonEmptyString(name) || !isNonEmptyString(email) || !isNonEmptyString(password)) {
     throw new AppError(400, 'name, email y password son obligatorios');
@@ -15,7 +15,7 @@ export const register = async (req: Request, res: Response) => {
     throw new AppError(400, 'studies debe ser una lista de textos');
   }
 
-  const user = await registerService({ name, email, password, role, studies });
+  const user = await registerService({ name, email, password, role, studies, timezone });
   // Se devuelve la sesión ya iniciada: el frontend no necesita un login extra.
   res.status(201).json({
     message: 'Usuario registrado correctamente',

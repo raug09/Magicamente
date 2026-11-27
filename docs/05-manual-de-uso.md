@@ -24,7 +24,7 @@ Edita `Backend/.env`:
 | `PORT` | no | `3000` | Puerto HTTP |
 | `RESEND_API_KEY` | para enviar correos | — | Envío de correo |
 | `EMAIL_FROM` | no | `Soporte <support@magicamente.online>` | Remitente |
-| `APP_TIMEZONE` | no | `UTC` | Zona horaria de las fechas en los correos |
+| `APP_TIMEZONE` | no | `UTC` | Zona horaria **por defecto de las cuentas nuevas** (cada usuario puede tener la suya) |
 | `CORS_ORIGIN` | no | solo `FRONTEND_URL` | Orígenes web autorizados (lista separada por comas, o `*`) |
 | `TRUST_PROXY` | detrás de un proxy | sin definir | Nº de proxies delante del servidor (p. ej. `1` en Render, Railway, Heroku o Nginx). **Ponlo si despliegas detrás de un proxy**: si no, el límite de intentos vería la IP del proxy y bloquearía a todos a la vez |
 | `FRONTEND_URL` | para recuperar contraseña | `http://localhost:5173` | URL base del frontend; el correo enlaza a `<FRONTEND_URL>/reset-password?token=...` |
@@ -55,9 +55,9 @@ Usa una fecha futura en `day`.
 API=http://localhost:3000
 json() { node -pe "JSON.parse(require('fs').readFileSync(0)).$1"; }
 
-# 1. Registrar un psicólogo y un paciente
+# 1. Registrar un psicólogo y un paciente (la zona horaria es opcional; por defecto UTC)
 curl -s -X POST $API/api/auth/register -H 'Content-Type: application/json' \
-  -d '{"name":"Dra. Ana","email":"ana@example.com","password":"secreto123","role":"psicologo","studies":["Clínica"]}'
+  -d '{"name":"Dra. Ana","email":"ana@example.com","password":"secreto123","role":"psicologo","studies":["Clínica"],"timezone":"America/Bogota"}'
 curl -s -X POST $API/api/auth/register -H 'Content-Type: application/json' \
   -d '{"name":"Luis","email":"luis@example.com","password":"secreto123"}'
 
@@ -70,9 +70,10 @@ PAC_TOKEN=$(curl -s -X POST $API/api/auth/login -H 'Content-Type: application/js
 # 3. El id del psicólogo (en la práctica, el paciente lo obtiene del listado del paso 5)
 PSI_ID=$(node -pe "JSON.parse(Buffer.from('$PSI_TOKEN'.split('.')[1],'base64url')).id")
 
-# 4. El psicólogo publica una franja (siempre para sí mismo)
+# 4. El psicólogo publica una franja (siempre para sí mismo): día y hora en SU zona horaria
+#    (con "repeatWeeks": 8 se repetiría cada semana durante 8 semanas)
 SCHEDULE_ID=$(curl -s -X POST $API/api/schedule -H "Authorization: Bearer $PSI_TOKEN" -H 'Content-Type: application/json' \
-  -d '{"day":"2026-12-15","hour":"10:00"}' | json schedule._id)
+  -d '{"day":"2026-12-15","hour":"10:00"}' | json 'schedules[0]._id')
 
 # 5. El paciente busca psicólogos, y mira las franjas del elegido
 curl -s "$API/api/psychologists?q=ana" -H "Authorization: Bearer $PAC_TOKEN"
@@ -141,6 +142,7 @@ Sin `RESEND_API_KEY` verás en consola `[email] RESEND_API_KEY no definido; no s
 | `401 Token no válido` | El token caducó (1 h) o `JWT_SECRET` cambió desde que se emitió |
 | `403` al editar un usuario | Solo puedes editar tu cuenta, y solo `name`, `description`, `studies`, `password` |
 | `403` al crear un horario | Solo los psicólogos (para sí mismos) o los administradores |
+| `400 La hora ... no existe en ... (cambio de hora)` | Esa hora no existe el día en que el reloj salta hacia delante: elige otra |
 | `409` al modificar o borrar una franja | Tiene una cita reservada: cancélala antes |
 | `409` al reservar | La franja ya está ocupada, o ya tienes otra cita a esa hora |
 | `400` al cancelar | La cita ya no está `pendiente` (ya cancelada o completada) |

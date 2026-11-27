@@ -1,16 +1,17 @@
 import { Request, Response } from 'express';
 import * as scheduleService from '../services/scheduleService';
 import { AppError } from '../utils/AppError';
+import { parseDayString } from '../utils/timezone';
 
 const HOUR_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
-const DAY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+const MAX_REPEAT_WEEKS = 26;
 
-const parseDay = (value: unknown, name: string): Date => {
-  const parsed = new Date(value as string);
-  if (value === undefined || value === null || value === '' || Number.isNaN(parsed.getTime())) {
-    throw new AppError(400, `${name} debe ser una fecha válida (p. ej. "2026-12-15")`);
+/** `day` debe ser un día de calendario real con formato YYYY-MM-DD (en la zona del psicólogo). */
+const parseDay = (value: unknown, name = 'day'): string => {
+  if (typeof value !== 'string' || !parseDayString(value)) {
+    throw new AppError(400, `${name} debe ser una fecha válida con formato YYYY-MM-DD (p. ej. "2026-12-15")`);
   }
-  return parsed;
+  return value;
 };
 
 const parseHour = (value: unknown): string => {
@@ -20,18 +21,21 @@ const parseHour = (value: unknown): string => {
   return value;
 };
 
-const assertNotPast = (day: Date) => {
-  if (day < new Date()) {
-    throw new AppError(400, 'No puedes crear horarios en fechas pasadas');
+const parseRepeatWeeks = (value: unknown): number => {
+  if (value === undefined) return 1;
+  if (typeof value !== 'number' || !Number.isInteger(value) || value < 1 || value > MAX_REPEAT_WEEKS) {
+    throw new AppError(400, `repeatWeeks debe ser un entero entre 1 y ${MAX_REPEAT_WEEKS}`);
   }
+  return value;
 };
 
 /**
  * Un psicólogo crea franjas para sí mismo. Un administrador debe indicar `psychologist`.
+ * `day` y `hour` se interpretan en la zona horaria del psicólogo. Con `repeatWeeks` se repite cada semana.
  */
 export const createSchedule = async (req: Request, res: Response) => {
   const requester = req.user!;
-  const { day, hour, recurrent, psychologist: bodyPsychologist } = req.body ?? {};
+  const { day, hour, repeatWeeks, psychologist: bodyPsychologist } = req.body ?? {};
 
   let psychologist: string;
   if (requester.role === 'psicologo') {
@@ -46,17 +50,13 @@ export const createSchedule = async (req: Request, res: Response) => {
     psychologist = String(bodyPsychologist);
   }
 
-  const parsedDay = parseDay(day, 'day');
-  const parsedHour = parseHour(hour);
-  assertNotPast(parsedDay);
-
-  const schedule = await scheduleService.createSchedule({
+  const { schedules, skipped } = await scheduleService.createSchedules({
     psychologist,
-    day: parsedDay,
-    hour: parsedHour,
-    recurrent: recurrent === true,
+    day: parseDay(day),
+    hour: parseHour(hour),
+    repeatWeeks: parseRepeatWeeks(repeatWeeks),
   });
-  res.status(201).json({ message: 'Horario creado exitosamente', schedule });
+  res.status(201).json({ message: 'Horario creado exitosamente', schedules, skipped });
 };
 
 /**
@@ -76,13 +76,8 @@ export const getSchedulesByPsychologist = async (req: Request, res: Response) =>
     availableFilter = available === 'true';
   }
 
-  const parseQueryDay = (value: unknown, name: string): Date | undefined => {
-    if (value === undefined) return undefined;
-    if (typeof value !== 'string' || !DAY_PATTERN.test(value)) {
-      throw new AppError(400, `${name} debe tener formato YYYY-MM-DD`);
-    }
-    return parseDay(value, name);
-  };
+  const parseQueryDay = (value: unknown, name: string): Date | undefined =>
+    value === undefined ? undefined : new Date(`${parseDay(value, name)}T00:00:00.000Z`);
 
   const fromDay = parseQueryDay(from, 'from');
   const toDay = parseQueryDay(to, 'to');
@@ -109,14 +104,9 @@ export const updateSchedule = async (req: Request, res: Response) => {
     throw new AppError(400, 'Indica day y/o hour');
   }
 
-  const changes: { day?: Date; hour?: string } = {};
-  if (body.day !== undefined) {
-    changes.day = parseDay(body.day, 'day');
-    assertNotPast(changes.day);
-  }
-  if (body.hour !== undefined) {
-    changes.hour = parseHour(body.hour);
-  }
+  const changes: { day?: string; hour?: string } = {};
+  if (body.day !== undefined) changes.day = parseDay(body.day);
+  if (body.hour !== undefined) changes.hour = parseHour(body.hour);
 
   const schedule = await scheduleService.updateSchedule(req.params.id, req.user!, changes);
   res.status(200).json({ message: 'Horario actualizado', schedule });

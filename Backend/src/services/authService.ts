@@ -7,6 +7,7 @@ import { getFrontendUrl, getJwtSecret } from '../config/env';
 import { AppError } from '../utils/AppError';
 import { Role } from '../middlewares/auth';
 import { assertValidPassword } from '../utils/password';
+import { assertValidTimeZone } from '../utils/timezone';
 
 /** Roles que se pueden elegir en el registro público. Los administradores se crean aparte. */
 export const SELF_REGISTER_ROLES: Role[] = ['paciente', 'psicologo'];
@@ -26,13 +27,15 @@ export interface RegisterInput {
   password: string;
   role?: Role;
   studies?: string[];
+  timezone?: string;
 }
 
-export const registerService = async ({ name, email, password, role = 'paciente', studies }: RegisterInput): Promise<IUser> => {
+export const registerService = async ({ name, email, password, role = 'paciente', studies, timezone }: RegisterInput): Promise<IUser> => {
   if (!SELF_REGISTER_ROLES.includes(role)) {
     throw new AppError(400, `Rol no permitido en el registro. Usa: ${SELF_REGISTER_ROLES.join(', ')}`);
   }
   assertValidPassword(password);
+  if (timezone !== undefined) assertValidTimeZone(timezone);
 
   const existingUser = await User.findOne({ email });
   if (existingUser) {
@@ -45,6 +48,7 @@ export const registerService = async ({ name, email, password, role = 'paciente'
     password: await hashPassword(password),
     role,
     studies,
+    ...(timezone !== undefined && { timezone }),
   });
   await newUser.save();
 

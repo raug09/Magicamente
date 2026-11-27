@@ -39,10 +39,12 @@ Las referencias (S1, F2…) apuntan a [06 · Problemas conocidos](06-problemas-c
 
 - `GET /api/auth/me`, registro que devuelve la sesión y borrado de cuentas sin datos huérfanos (F16).
 
+## ✅ Hecho: zonas horarias y franjas recurrentes
+
+- `timezone` por usuario, `startsAt` como instante real, `repeatWeeks`, franjas para hoy (F12, F14).
+
 ## Siguiente · Completar el producto mínimo
 
-- [ ] Decidir la estrategia de zonas horarias (F14) y franjas para hoy (F12).
-- [ ] Horarios recurrentes (`recurrent`) o eliminar el campo.
 
 ## Calidad y despliegue
 

@@ -20,7 +20,8 @@ describe('POST /api/schedule', () => {
     const res = await request(app).post('/api/schedule').set(auth(psychologist)).send({ day: futureDay(), hour: '10:00' });
 
     expect(res.status).toBe(201);
-    expect(res.body.schedule.psychologist).toBe(psychologist.id);
+    expect(res.body.schedules).toHaveLength(1);
+    expect(res.body.schedules[0].psychologist).toBe(psychologist.id);
     expect((await User.findById(psychologist.id))?.schedules).toHaveLength(1);
   });
 
@@ -160,7 +161,7 @@ describe('PUT y DELETE /api/schedule/:id', () => {
     const other = await createUser('psicologo');
     const patient = await createUser('paciente');
     const create = await request(app).post('/api/schedule').set(auth(psychologist)).send({ day: futureDay(10), hour: '10:00' });
-    return { psychologist, other, patient, id: create.body.schedule._id as string };
+    return { psychologist, other, patient, id: create.body.schedules[0]._id as string };
   };
 
   it('el psicólogo cambia la hora y el día de una franja libre', async () => {
@@ -238,5 +239,130 @@ describe('PUT y DELETE /api/schedule/:id', () => {
     expect((await put(psychologist, '000000000000000000000000', { hour: '10:00' })).status).toBe(404);
     expect((await del(psychologist, '000000000000000000000000')).status).toBe(404);
     expect((await del(psychologist, 'no-es-un-id')).status).toBe(400);
+  });
+});
+
+describe('zona horaria del psicólogo', () => {
+  const setup = async (timezone: string) => {
+    const psychologist = await createUser('psicologo');
+    await User.updateOne({ _id: psychologist.id }, { timezone });
+    const patient = await createUser('paciente');
+    return { psychologist, patient };
+  };
+  const create = (user: Parameters<typeof auth>[0], body: object) =>
+    request(app).post('/api/schedule').set(auth(user)).send(body);
+
+  it('day y hour se interpretan en la zona del psicólogo y se guarda el instante real', async () => {
+    const { psychologist } = await setup('America/Bogota');
+    const res = await create(psychologist, { day: futureDay(10), hour: '10:00' });
+
+    expect(res.status).toBe(201);
+    const [schedule] = res.body.schedules;
+    expect(schedule.timezone).toBe('America/Bogota');
+    expect(schedule.hour).toBe('10:00');
+    expect(schedule.day).toBe(`${futureDay(10)}T00:00:00.000Z`);
+    expect(schedule.startsAt).toBe(`${futureDay(10)}T15:00:00.000Z`); // 10:00 en Bogotá = 15:00 UTC
+  });
+
+  it('la cita empieza en el instante real de la franja', async () => {
+    const { psychologist, patient } = await setup('Asia/Tokyo');
+    const created = await create(psychologist, { day: futureDay(10), hour: '09:00' });
+    const scheduleId = created.body.schedules[0]._id;
+
+    const booked = await request(app).post('/api/appointments/appointment').set(auth(patient)).send({ scheduleId });
+    expect(booked.status).toBe(201);
+    // 09:00 en Tokio (UTC+9) = 00:00 UTC del mismo día
+    expect(booked.body.appointment.time).toBe(`${futureDay(10)}T00:00:00.000Z`);
+  });
+
+  it('available=true usa el instante real: una franja del día de hoy ya empezada no cuenta', async () => {
+    const { psychologist, patient } = await setup('UTC');
+    const today = new Date().toISOString().slice(0, 10);
+    await Schedule.create({ psychologist: psychologist.id, day: new Date(today), hour: '00:00' }); // ya pasó
+    await create(psychologist, { day: futureDay(5), hour: '10:00' });
+
+    const res = await request(app).get(`/api/schedule/${psychologist.id}?available=true`).set(auth(patient));
+    expect(res.body).toHaveLength(1);
+    expect(res.body[0].startsAt).toBe(`${futureDay(5)}T10:00:00.000Z`);
+  });
+
+  it('se puede crear una franja para el día de hoy del psicólogo si todavía no ha empezado', async () => {
+    // En UTC-12 el día de hoy y las 23:59 locales terminan 12 h después que en UTC.
+    const timezone = 'Etc/GMT+12';
+    const { psychologist } = await setup(timezone);
+    const localToday = new Date().toLocaleDateString('en-CA', { timeZone: timezone }); // YYYY-MM-DD
+
+    const res = await create(psychologist, { day: localToday, hour: '23:59' });
+    expect(res.status).toBe(201); // antes se rechazaba: "hoy" a medianoche UTC contaba como pasado
+    expect(new Date(res.body.schedules[0].startsAt).getTime()).toBeGreaterThan(Date.now());
+  });
+
+  it('una hora que no existe por el cambio de hora da 400 y no crea nada', async () => {
+    const { psychologist } = await setup('America/New_York');
+    const res = await create(psychologist, { day: '2027-03-14', hour: '02:30', repeatWeeks: 3 });
+    expect(res.status).toBe(400);
+    expect(await Schedule.countDocuments()).toBe(0);
+  });
+
+  it('al editar, se recalcula el instante con la zona actual del psicólogo', async () => {
+    const { psychologist } = await setup('America/Bogota');
+    const created = await create(psychologist, { day: futureDay(10), hour: '10:00' });
+    const id = created.body.schedules[0]._id;
+
+    await User.updateOne({ _id: psychologist.id }, { timezone: 'Europe/Madrid' });
+    const res = await request(app).put(`/api/schedule/${id}`).set(auth(psychologist)).send({ hour: '10:00' });
+    expect(res.status).toBe(200);
+    expect(res.body.schedule.timezone).toBe('Europe/Madrid');
+    expect(['09:00', '08:00']).toContain(res.body.schedule.startsAt.slice(11, 16)); // 09:00Z invierno, 08:00Z verano
+  });
+});
+
+describe('franjas recurrentes (repeatWeeks)', () => {
+  const create = (user: Parameters<typeof auth>[0], body: object) =>
+    request(app).post('/api/schedule').set(auth(user)).send(body);
+
+  it('crea una franja por semana a la misma hora', async () => {
+    const psychologist = await createUser('psicologo');
+    const res = await create(psychologist, { day: futureDay(10), hour: '10:00', repeatWeeks: 4 });
+
+    expect(res.status).toBe(201);
+    expect(res.body.schedules).toHaveLength(4);
+    expect(res.body.skipped).toEqual([]);
+    const days = res.body.schedules.map((s: { day: string }) => s.day.slice(0, 10));
+    const base = new Date(`${futureDay(10)}T00:00:00Z`).getTime();
+    expect(days).toEqual([0, 7, 14, 21].map((d) => new Date(base + d * 86_400_000).toISOString().slice(0, 10)));
+    expect((await User.findById(psychologist.id))?.schedules).toHaveLength(4);
+  });
+
+  it('omite las que ya existen y devuelve cuáles', async () => {
+    const psychologist = await createUser('psicologo');
+    await create(psychologist, { day: futureDay(17), hour: '10:00' }); // coincide con la 2.ª semana
+
+    const res = await create(psychologist, { day: futureDay(10), hour: '10:00', repeatWeeks: 3 });
+    expect(res.status).toBe(201);
+    expect(res.body.schedules).toHaveLength(2);
+    expect(res.body.skipped).toEqual([futureDay(17)]);
+    expect(await Schedule.countDocuments()).toBe(3);
+  });
+
+  it('si ya existían todas, responde 409', async () => {
+    const psychologist = await createUser('psicologo');
+    await create(psychologist, { day: futureDay(10), hour: '10:00', repeatWeeks: 2 });
+    expect((await create(psychologist, { day: futureDay(10), hour: '10:00', repeatWeeks: 2 })).status).toBe(409);
+  });
+
+  it('valida repeatWeeks (entero de 1 a 26)', async () => {
+    const psychologist = await createUser('psicologo');
+    for (const repeatWeeks of [0, 27, -1, 1.5, '3', null]) {
+      expect((await create(psychologist, { day: futureDay(10), hour: '10:00', repeatWeeks })).status).toBe(400);
+    }
+    expect((await create(psychologist, { day: futureDay(10), hour: '10:00', repeatWeeks: 26 })).body.schedules).toHaveLength(26);
+  });
+
+  it('day exige formato YYYY-MM-DD y una fecha real', async () => {
+    const psychologist = await createUser('psicologo');
+    for (const day of ['2026-02-30', '15/12/2026', `${futureDay(10)}T10:00:00Z`, 20261215, undefined]) {
+      expect((await create(psychologist, { day, hour: '10:00' })).status).toBe(400);
+    }
   });
 });

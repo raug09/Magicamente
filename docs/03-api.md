@@ -51,6 +51,7 @@ Los antiguos `POST /api/email/send-test` y `GET /api/notifications/test` se **el
 ```
 
 - `role` opcional: `paciente` (por defecto) o `psicologo`. Cualquier otro valor, incluido `administrador` → `400`.
+- `timezone` opcional: zona IANA (p. ej. `"America/Bogota"`); por defecto `UTC`; `400` si no es válida.
 - `password`: entre 8 caracteres y 72 bytes → si no, `400`.
 - `name`, `email`, `password` obligatorios → si faltan, `400`. `studies` debe ser una lista de textos.
 - Email ya usado → `409`.
@@ -112,7 +113,7 @@ Campos permitidos:
 
 | Quién | Campos |
 |---|---|
-| Uno mismo | `name`, `description`, `studies`, `password` |
+| Uno mismo | `name`, `description`, `studies`, `password`, `timezone` |
 | Administrador | los anteriores + `email`, `role`, `isActive` |
 
 - Un campo no permitido → `403` indicando cuál. Editar a otro usuario sin ser admin → `403`.
@@ -158,25 +159,29 @@ Listado de psicólogos **activos** para que un paciente elija. Lo puede usar cua
 
 Como psicólogo (la franja es siempre tuya):
 ```json
-{ "day": "2026-12-15", "hour": "10:00" }
+{ "day": "2026-12-15", "hour": "10:00", "repeatWeeks": 8 }
 ```
 Como administrador hay que añadir `"psychologist": "<idPsicologo>"`.
 
+- `day` (`YYYY-MM-DD`, fecha real) y `hour` (`HH:mm`) se interpretan **en la zona horaria del psicólogo** (`timezone` de su perfil); el servidor guarda el instante real en `startsAt` (UTC), teniendo en cuenta el horario de verano.
+- `repeatWeeks` (opcional, entero de 1 a 26, por defecto 1): crea una franja por semana, siempre a la misma hora local. Las que ya existen se omiten y se listan en `skipped`.
+
 - Psicólogo que indica otro `psychologist` → `403`. Paciente → `403`.
-- `day` fecha válida y futura (no vale hoy), `hour` en formato `HH:mm` → si no, `400`.
-- El destinatario no es psicólogo → `404`. Franja repetida → `409`.
-- `201 { "message": "Horario creado exitosamente", "schedule": {...} }`.
+- `400` si `day`/`hour` no tienen el formato correcto, si la franja ya ha empezado (se puede crear para hoy si aún no ha empezado), si `repeatWeeks` no es válido, o si esa hora **no existe** por un cambio de hora (en ese caso no se crea ninguna).
+- El destinatario no es psicólogo (o está desactivado) → `404`. Si **todas** las franjas ya existían → `409`.
+- `201 { "message": "Horario creado exitosamente", "schedules": [{...}], "skipped": ["2027-01-05"] }` (siempre una lista, aunque sea de una franja).
+- Cada franja: `_id`, `psychologist`, `day` (día del calendario del psicólogo, medianoche UTC), `hour`, `timezone`, `startsAt` (instante real, UTC), `isAvailable`, `createdAt`.
 
 ### `GET /api/schedule/:psychologistId` 🔒
 
-Franjas de un psicólogo, **ordenadas por día y hora**. Filtros opcionales:
+Franjas de un psicólogo, **ordenadas por instante de inicio (`startsAt`)**. Filtros opcionales:
 
 | Parámetro | Descripción |
 |---|---|
-| `available=true` | Solo franjas **libres y futuras** (las que se pueden reservar ahora). Una franja libre cuya hora ya pasó no se incluye |
+| `available=true` | Solo franjas **libres y que aún no han empezado** (las que se pueden reservar ahora) |
 | `available=false` | Solo las ocupadas |
-| `from=YYYY-MM-DD` | Desde ese día, incluido |
-| `to=YYYY-MM-DD` | Hasta ese día, incluido |
+| `from=YYYY-MM-DD` | Desde ese día del calendario del psicólogo, incluido |
+| `to=YYYY-MM-DD` | Hasta ese día del calendario del psicólogo, incluido |
 
 Ejemplo: `GET /api/schedule/6740...?available=true&from=2026-12-01&to=2026-12-31`
 
@@ -192,7 +197,7 @@ Cambia el día y/o la hora de una franja **libre**.
 { "hour": "12:30" }
 ```
 
-- Campos permitidos: `day` y `hour` (mismas validaciones que al crear). Cualquier otro → `403`; ninguno → `400`.
+- Campos permitidos: `day` y `hour` (mismo formato que al crear, en la zona **actual** del psicólogo: la franja pasa a guardarse con ella). Cualquier otro → `403`; ninguno → `400`. No se puede mover a una fecha pasada (`400`).
 - `403` si la franja es de otro psicólogo (un administrador puede con cualquiera) · `404` si no existe.
 - `409` si ya hay otra franja del psicólogo en ese día y hora, o si la franja tiene una cita reservada (hay que cancelar la cita primero).
 - `200 { "message": "Horario actualizado", "schedule": {...} }`.
@@ -213,7 +218,7 @@ Borra una franja **libre** y la quita de la lista del psicólogo.
 ```
 
 - El paciente es siempre el usuario autenticado y el psicólogo, el dueño del horario. Si el body trae `patientId` o `psychologistId`, se ignoran.
-- Calcula `time` = `schedule.day` + `schedule.hour` (UTC), crea la cita `pendiente` y marca la franja como ocupada de forma atómica.
+- `time` = `schedule.startsAt` (el instante real de la franja), crea la cita `pendiente` y marca la franja como ocupada de forma atómica.
 - `201 { "message": "Cita agendada correctamente", "appointment": {...} }`.
 - Errores:
 

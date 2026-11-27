@@ -2,24 +2,29 @@ import Schedule from '../models/Schedule';
 import User from '../models/User';
 import { AuthUser } from '../middlewares/auth';
 import { AppError } from '../utils/AppError';
+import { getAppTimezone } from '../config/env';
+import { weeklyOccurrences, zonedTimeToUtc } from '../utils/timezone';
 
 export interface CreateScheduleInput {
   psychologist: string;
-  day: Date;
+  /** Día del calendario del psicólogo, "YYYY-MM-DD". */
+  day: string;
+  /** Hora de pared del psicólogo, "HH:mm". */
   hour: string;
-  recurrent?: boolean;
+  /** Cuántas semanas seguidas se repite (1 = solo ese día). */
+  repeatWeeks?: number;
 }
 
 export interface ListSchedulesFilter {
   /** true: solo franjas libres y futuras; false: solo las ocupadas; undefined: todas. */
   available?: boolean;
-  /** Primer día incluido (medianoche UTC). */
+  /** Primer día incluido (medianoche UTC), referido al calendario del psicólogo. */
   from?: Date;
-  /** Último día incluido (medianoche UTC). */
+  /** Último día incluido (medianoche UTC), referido al calendario del psicólogo. */
   to?: Date;
 }
 
-/** Fecha y hora (UTC) en la que empieza una franja. */
+/** Instante en que empieza una franja guardada sin `startsAt` (datos antiguos, siempre en UTC). */
 export const slotStart = (day: Date, hour: string): Date => {
   const [hours, minutes] = hour.split(':').map(Number);
   const start = new Date(day);
@@ -27,41 +32,59 @@ export const slotStart = (day: Date, hour: string): Date => {
   return start;
 };
 
-export const createSchedule = async ({ psychologist, day, hour, recurrent }: CreateScheduleInput) => {
-  const psychologistUser = await User.findOne({ _id: psychologist, role: 'psicologo' });
+/** Zona horaria del psicólogo, o la de la aplicación si no tiene. */
+const timezoneOf = (user: { timezone?: string }): string => user.timezone || getAppTimezone();
+
+/**
+ * Crea una franja, o una por semana si `repeatWeeks > 1`. `day` y `hour` se interpretan en la zona
+ * horaria del psicólogo; cada ocurrencia conserva la misma hora de pared aunque cambie el horario de verano.
+ * Las que ya existían se omiten y se devuelven en `skipped`.
+ */
+export const createSchedules = async ({ psychologist, day, hour, repeatWeeks = 1 }: CreateScheduleInput) => {
+  const psychologistUser = await User.findOne({ _id: psychologist, role: 'psicologo', isActive: { $ne: false }, deletedAt: null });
   if (!psychologistUser) {
     throw new AppError(404, 'Psicólogo no encontrado');
   }
+  const timezone = timezoneOf(psychologistUser);
 
-  const existingSchedule = await Schedule.findOne({ psychologist, day, hour });
-  if (existingSchedule) {
-    throw new AppError(409, 'Ya existe un horario con la misma fecha y hora para este psicólogo.');
+  // Se calculan todas antes de crear ninguna: si una cae en un cambio de hora, no se crea nada.
+  const occurrences = weeklyOccurrences(day, hour, timezone, repeatWeeks);
+  if (occurrences[0].startsAt <= new Date()) {
+    throw new AppError(400, 'No puedes crear horarios en fechas pasadas');
   }
 
-  const schedule = await Schedule.create({ psychologist, day, hour, recurrent });
-  await User.findByIdAndUpdate(psychologist, { $push: { schedules: schedule._id } });
+  const schedules = [];
+  const skipped: string[] = [];
+  for (const occurrence of occurrences) {
+    const dayDate = new Date(`${occurrence.day}T00:00:00.000Z`);
+    if (await Schedule.exists({ psychologist, day: dayDate, hour })) {
+      skipped.push(occurrence.day);
+      continue;
+    }
+    schedules.push(await Schedule.create({ psychologist, day: dayDate, hour, timezone, startsAt: occurrence.startsAt }));
+  }
 
-  return schedule;
+  if (schedules.length === 0) {
+    throw new AppError(409, 'Ya existe un horario con la misma fecha y hora para este psicólogo.');
+  }
+  await User.findByIdAndUpdate(psychologist, { $push: { schedules: { $each: schedules.map((schedule) => schedule._id) } } });
+
+  return { schedules, skipped };
 };
 
-/** Franjas de un psicólogo ordenadas por fecha y hora, con filtros opcionales. */
+/** Franjas de un psicólogo ordenadas por instante de inicio, con filtros opcionales. */
 export const listSchedules = async (psychologist: string, { available, from, to }: ListSchedulesFilter = {}) => {
   const filter: Record<string, unknown> = { psychologist };
   if (available !== undefined) filter.isAvailable = available;
+  // "Disponible" también significa que todavía no ha empezado (no se pueden reservar franjas pasadas).
+  if (available === true) filter.startsAt = { $gt: new Date() };
 
   const day: Record<string, Date> = {};
   if (from) day.$gte = from;
   if (to) day.$lte = to;
   if (Object.keys(day).length > 0) filter.day = day;
 
-  const schedules = await Schedule.find(filter).sort({ day: 1, hour: 1 });
-
-  // "Disponible" también significa que todavía no ha empezado (no se pueden reservar franjas pasadas).
-  if (available === true) {
-    const now = new Date();
-    return schedules.filter((schedule) => slotStart(schedule.day, schedule.hour) > now);
-  }
-  return schedules;
+  return Schedule.find(filter).sort({ startsAt: 1 });
 };
 
 /** Mantengo el nombre anterior por compatibilidad. */
@@ -85,19 +108,30 @@ const getOwnedSchedule = async (scheduleId: string, user: AuthUser) => {
 
 const OCCUPIED_MESSAGE = 'El horario tiene una cita reservada: cancélala antes de modificarlo o borrarlo.';
 
-/** Cambia el día y/o la hora de una franja libre. */
+/**
+ * Cambia el día y/o la hora de una franja libre. Se interpretan en la zona horaria ACTUAL del psicólogo,
+ * y la franja pasa a guardarse con ella.
+ */
 export const updateSchedule = async (
   scheduleId: string,
   user: AuthUser,
-  changes: { day?: Date; hour?: string }
+  changes: { day?: string; hour?: string }
 ) => {
   const schedule = await getOwnedSchedule(scheduleId, user);
   if (!schedule.isAvailable) {
     throw new AppError(409, OCCUPIED_MESSAGE);
   }
 
-  const day = changes.day ?? schedule.day;
+  const owner = await User.findById(schedule.psychologist);
+  const timezone = timezoneOf(owner ?? {});
+  const dayString = changes.day ?? schedule.day.toISOString().slice(0, 10);
   const hour = changes.hour ?? schedule.hour;
+
+  const startsAt = zonedTimeToUtc(dayString, hour, timezone);
+  if (startsAt <= new Date()) {
+    throw new AppError(400, 'No puedes mover un horario a una fecha pasada');
+  }
+  const day = new Date(`${dayString}T00:00:00.000Z`);
 
   const duplicate = await Schedule.findOne({ _id: { $ne: schedule._id }, psychologist: schedule.psychologist, day, hour });
   if (duplicate) {
@@ -105,7 +139,11 @@ export const updateSchedule = async (
   }
 
   // Condicionado a isAvailable: si alguien reservó entre medias, no se modifica.
-  const updated = await Schedule.findOneAndUpdate({ _id: schedule._id, isAvailable: true }, { day, hour }, { new: true });
+  const updated = await Schedule.findOneAndUpdate(
+    { _id: schedule._id, isAvailable: true },
+    { day, hour, timezone, startsAt },
+    { new: true }
+  );
   if (!updated) {
     throw new AppError(409, OCCUPIED_MESSAGE);
   }

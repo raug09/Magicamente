@@ -43,7 +43,7 @@ export const scheduleAppointment = async ({ patientId, scheduleId }: { patientId
     throw new AppError(409, 'El psicólogo ya no está disponible.');
   }
 
-  const appointmentTime = slotStart(schedule.day, schedule.hour);
+  const appointmentTime = schedule.startsAt ?? slotStart(schedule.day, schedule.hour);
   if (appointmentTime < new Date()) {
     throw new AppError(400, 'No puedes agendar citas en fechas pasadas.');
   }

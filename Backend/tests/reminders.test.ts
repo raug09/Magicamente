@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import Appointment from '../src/models/appointment';
+import User from '../src/models/User';
 import { createScheduleFor, createUser } from './helpers';
 
 vi.mock('../src/services/emailService', () => ({ sendEmail: vi.fn().mockResolvedValue({ id: 'test' }) }));
@@ -60,6 +61,21 @@ describe('recordatorios de citas', () => {
     expect((await Appointment.findById(appointment._id))?.reminderSent).toBe(false);
 
     expect(await sendAppointmentReminders()).toBe(1);
+  });
+
+  it('el recordatorio sale en la zona horaria del paciente', async () => {
+    const { appointment, patient } = await createAppointment(10);
+    await User.updateOne({ _id: patient.id }, { timezone: 'America/Bogota' });
+    await Appointment.updateOne({ _id: appointment._id }, { time: new Date(Date.now() + 10 * HOUR) });
+
+    await sendAppointmentReminders();
+    const [, , , , hour] = vi.mocked(sendEmail).mock.calls[0] as unknown as string[];
+    const expected = new Date((await Appointment.findById(appointment._id))!.time).toLocaleTimeString('es-ES', {
+      timeZone: 'America/Bogota',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+    expect(hour).toBe(expected);
   });
 
   it('formatea fecha completa y hora con minutos', () => {

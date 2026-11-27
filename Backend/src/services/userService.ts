@@ -8,13 +8,14 @@ import { hashPassword } from './authService';
 import { sendEmail } from './emailService';
 import { updateAvailabilitySchedule } from './scheduleService';
 import { assertValidPassword } from '../utils/password';
+import { assertValidTimeZone } from '../utils/timezone';
 import { formatAppointmentDate } from '../utils/dates';
 
 /** Campos visibles de un psicólogo para cualquier usuario autenticado. */
 const PUBLIC_PSYCHOLOGIST_FIELDS = 'name role studies description';
 
 /** Campos que cualquier usuario puede cambiar de su propia cuenta. */
-const SELF_EDITABLE = ['name', 'description', 'studies', 'password'] as const;
+const SELF_EDITABLE = ['name', 'description', 'studies', 'password', 'timezone'] as const;
 /** Campos que además puede cambiar un administrador. */
 const ADMIN_EDITABLE = [...SELF_EDITABLE, 'email', 'role', 'isActive'] as const;
 
@@ -52,6 +53,9 @@ export const updateUserService = async (
     update.password = await hashPassword(assertValidPassword(update.password));
     update.passwordChangedAt = new Date(); // invalida las sesiones abiertas (también la actual)
   }
+  if ('timezone' in update) {
+    update.timezone = assertValidTimeZone(update.timezone);
+  }
   if ('role' in update && !ROLES.includes(update.role as Role)) {
     throw new AppError(400, `role debe ser uno de: ${ROLES.join(', ')}`);
   }
@@ -64,7 +68,7 @@ const notifyCancellation = async (counterpartId: unknown, time: Date): Promise<v
   try {
     const counterpart = await User.findOne({ _id: counterpartId, isActive: { $ne: false }, ...NOT_DELETED });
     if (!counterpart) return;
-    const { date, hour } = formatAppointmentDate(time);
+    const { date, hour } = formatAppointmentDate(time, counterpart.timezone);
     await sendEmail('appointmentCancelled', counterpart.email, counterpart.name, date, hour);
   } catch (error) {
     console.error('Error al avisar de una cita cancelada:', error);

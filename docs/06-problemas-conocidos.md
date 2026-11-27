@@ -10,8 +10,6 @@ Prioridad: 🔴 crítico · 🟠 importante · 🟡 menor.
 
 | # | Prio | Problema | Dónde |
 |---|---|---|---|
-| F12 | 🟡 | Crear horario compara `day` (medianoche) con ahora: imposible crear franjas para hoy | `scheduleController.createSchedule` |
-| F14 | 🟡 | Las horas se interpretan en UTC; sin gestión de zona horaria por usuario | `appointmentService`, `Schedule.hour` |
 
 ### Seguridad
 
@@ -28,7 +26,6 @@ No hay problemas de seguridad abiertos conocidos. Límites a tener en cuenta:
 - Sin linter/formatter.
 - Sin logger (`pino`); quedan algunos `console.log` sueltos.
 - Nombre de archivo inconsistente: `models/appointment.ts` frente a `User.ts` y `Schedule.ts`.
-- Campo `recurrent` y plantilla `resetPassword` sin uso.
 - Mezcla de idiomas en mensajes de respuesta (inglés y español).
 - El email no se normaliza (mayúsculas/espacios).
 
@@ -66,6 +63,9 @@ No hay problemas de seguridad abiertos conocidos. Límites a tener en cuenta:
 | — | Aceptaba cualquier algoritmo de JWT | Solo HS256 |
 | F16 | Borrar un usuario dejaba horarios y citas huérfanos | `DELETE /users/:id` anonimiza la cuenta, cancela sus citas pendientes (avisando por correo), libera o borra franjas y protege al último administrador |
 | — | Un psicólogo desactivado seguía siendo reservable | La reserva exige un psicólogo activo (`409`) |
+| F12 | Imposible crear franjas para hoy | Se compara el instante real (`startsAt`) con ahora: se puede crear para hoy si no ha empezado |
+| F14 | Todo se interpretaba en UTC | `timezone` por usuario, `startsAt` (instante real) en franjas y citas, conversión con horario de verano, correos en la zona del destinatario y migración de datos antiguos |
+| — | Campo `recurrent` sin lógica | Sustituido por `repeatWeeks` en `POST /schedule` (franjas semanales a la misma hora local) |
 | — | Sin tests ni CI | Vitest + Supertest + MongoDB en memoria; workflow de GitHub Actions |
 | F1 | “Mis citas” siempre devolvía 403 (roles en inglés) y respondía dos veces | Roles `paciente`/`psicologo`, `asyncHandler`; el populate ya no expone contraseñas ni emails ajenos; ordenado por fecha |
 | F4 | Cancelar guardaba `'cancelled'` (fuera del enum) | Guarda `'cancelada'` con validación; migración de los datos antiguos al arrancar |

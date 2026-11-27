@@ -54,10 +54,11 @@ Decisiones de seguridad:
 ## 2. Publicar disponibilidad (psicólogo)
 
 1. El psicólogo hace login.
-2. Por cada franja: `POST /api/schedule { day, hour }`. El psicólogo es siempre el usuario autenticado (un administrador puede indicar `psychologist`).
-3. Se valida la fecha (futura), el formato `HH:mm`, que el destinatario sea psicólogo y que no haya otra franja igual (409). Se crea el `Schedule` y se añade a `user.schedules`.
+2. `POST /api/schedule { day, hour, repeatWeeks? }`. El psicólogo es siempre el usuario autenticado (un administrador puede indicar `psychologist`).
+3. `day` y `hour` se interpretan **en la zona horaria del psicólogo** y se convierten al instante UTC real (`startsAt`). Se calculan antes todas las ocurrencias semanales (si una cae en un cambio de hora inexistente, no se crea ninguna) y se validan: formato, que la primera no haya empezado y que el destinatario sea un psicólogo activo.
+4. Se crea una franja por semana (`repeatWeeks`, hasta 26), omitiendo las que ya existían (`skipped`); si ya existían todas, `409`. Todas se añaden a `user.schedules`.
 
-Cada franja es un hueco único (una fecha y una hora). El campo `recurrent` existe pero no genera franjas repetidas.
+Cada franja es un hueco único (una fecha y una hora) e independiente: las de una serie semanal se mueven o se borran por separado. Cada semana conserva la hora local aunque cambie el horario de verano.
 
 **Gestionar franjas ya publicadas:** el psicólogo puede cambiar el día o la hora (`PUT /api/schedule/:id`) o borrarla (`DELETE`), **solo si está libre**. Si un paciente la reservó, el psicólogo debe cancelar antes la cita. Ambas operaciones están condicionadas a `isAvailable: true` en la propia escritura, así que una reserva simultánea nunca queda con la franja modificada o borrada.
 
@@ -69,8 +70,8 @@ flowchart TD
   B -- no --> X1[404]
   B -- sí --> C{¿isAvailable?}
   C -- no --> X2[409 ocupada]
-  C -- sí --> D[time = day + hour en UTC]
-  D --> E{¿time en el pasado?}
+  C -- sí --> D[time = schedule.startsAt, el instante real UTC]
+  D --> E{¿startsAt en el pasado?}
   E -- sí --> X3[400]
   E -- no --> F{¿el paciente ya tiene otra cita viva a esa hora?}
   F -- sí --> X4[409]
@@ -122,7 +123,7 @@ Los pasos se ejecutan en orden y cada uno es independiente (sin transacción, Mo
 - Para cada una, primero marca `reminderSent: true` de forma atómica (así dos procesos no envían el mismo aviso) y luego envía `appointmentReminder` al paciente.
 - Si el envío falla, vuelve a poner `reminderSent: false` para reintentarlo en la siguiente hora.
 - Resultado: **un solo correo por cita**, entre 23 y 24 horas antes (o en la siguiente ejecución horaria, si se reserva con menos de 24 h de antelación).
-- El correo muestra la fecha completa y la hora con minutos (“martes, 15 de diciembre de 2026 a las 10:00”) en la zona `APP_TIMEZONE` (por defecto `UTC`, la misma en la que se guardan las horas).
+- El correo muestra la fecha completa y la hora con minutos (“martes, 15 de diciembre de 2026 a las 10:00”) en **la zona horaria del paciente** (`user.timezone`).
 
 ## 6. Plantillas de correo (`config/emailTemplates.ts`)
 
