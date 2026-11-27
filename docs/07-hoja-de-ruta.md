@@ -11,20 +11,15 @@ Las referencias (S1, F2…) apuntan a [06 · Problemas conocidos](06-problemas-c
 - Tests de integración (Vitest + Supertest + MongoDB en memoria) y workflow de CI.
 - Permisos de usuarios, horarios y citas (S2, S5, S6, S7); middleware de errores (S9, F7, F11, F17).
 
-## Siguiente · Arreglar el flujo de citas (paso 4, ~1 día)
+## ✅ Hecho (paso 4): flujo de citas
 
-- [ ] `getAppointments`: roles correctos, `asyncHandler` + `AppError` (F1).
-- [ ] Cancelación: `'cancelada'` y `runValidators: true` (F4). Migrar los documentos existentes: `db.appointments.updateMany({ state: 'cancelled' }, { $set: { state: 'cancelada' } })`.
-- [ ] Sustituir el índice único de `scheduleId` por uno parcial sobre citas no canceladas (F5):
-  ```ts
-  appointmentSchema.index({ scheduleId: 1 }, { unique: true, partialFilterExpression: { state: { $in: ['pendiente', 'completada'] } } });
-  ```
-  En una base de datos existente hay que borrar el índice antiguo: `db.appointments.dropIndex('scheduleId_1')`.
-- [ ] Reserva atómica: `Schedule.findOneAndUpdate({ _id, isAvailable: true }, { isAvailable: false })`; si devuelve `null`, la franja está ocupada (F15).
-- [ ] Errores de reserva con `AppError` (400/404/409) en lugar de 201 (F6).
-- [ ] Reglas de estado: el psicólogo marca `completada` tras la sesión; `cancelada` solo por el endpoint de cancelar (F10, F18).
+- “Mis citas” funciona para pacientes y psicólogos (F1).
+- Cancelación con el estado correcto, solo de citas pendientes, y migración de datos antiguos (F4).
+- Una franja cancelada se puede volver a reservar: índice único parcial (F5).
+- Reserva atómica y errores 400/404/409 en lugar de 201 (F6, F15).
+- `update` solo marca `completada`, por el psicólogo y tras la cita (F10, F18).
 
-## Después · Completar el producto mínimo
+## Siguiente · Completar el producto mínimo
 
 - [ ] `GET /api/psychologists` con nombre, estudios y descripción (F8).
 - [ ] `GET /api/schedule/:id?from=&available=true` con filtros; `PUT`/`DELETE` de franjas (solo si no hay cita).

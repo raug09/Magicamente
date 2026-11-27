@@ -10,16 +10,9 @@ Prioridad: 🔴 crítico · 🟠 importante · 🟡 menor.
 
 | # | Prio | Problema | Dónde |
 |---|---|---|---|
-| F1 | 🔴 | `GET /api/appointments/appointment` **siempre devuelve 403**: compara con `'patient'`/`'psychologist'` en vez de `'paciente'`/`'psicologo'`. Después además intenta responder 200 → *headers already sent* | `appointmentController.getAppointments` |
-| F4 | 🟠 | Cancelar guarda `state: 'cancelled'`, que no está en el enum (`'cancelada'`). `findByIdAndUpdate` no valida, así que se guarda un valor inválido | `appointmentService.cancelAppointment` |
-| F5 | 🟠 | Índice **único** en `Appointment.scheduleId`: una franja cancelada vuelve a estar disponible pero **no se puede volver a reservar** (409) | `models/appointment.ts` |
-| F6 | 🟠 | Los errores de negocio al reservar se devuelven con **201** dentro de `appointment.error` | `appointmentService.scheduleAppointment` |
 | F8 | 🟠 | No hay **listado de psicólogos** para pacientes (solo el perfil público si ya se conoce el id) | rutas |
-| F10 | 🟠 | No se puede marcar una cita como `completada` después de celebrarse (regla de 24 h aplicada a cualquier cambio) | `appointmentService.updateAppointment` |
-| F18 | 🟡 | Pasar una cita a `cancelada` desde `update` no libera la franja (para eso está el endpoint de cancelar) | `appointmentService.updateAppointment` |
 | F12 | 🟡 | Crear horario compara `day` (medianoche) con ahora: imposible crear franjas para hoy | `scheduleController.createSchedule` |
 | F14 | 🟡 | Las horas se interpretan en UTC; sin gestión de zona horaria por usuario | `appointmentService`, `Schedule.hour` |
-| F15 | 🟡 | Reserva no atómica (comprobar `isAvailable` y luego crear): condición de carrera | `appointmentService.scheduleAppointment` |
 | F16 | 🟡 | Borrar un usuario deja horarios y citas huérfanos | `userService.deleteUserService` |
 
 ### Seguridad
@@ -34,8 +27,7 @@ Prioridad: 🔴 crítico · 🟠 importante · 🟡 menor.
 
 - Sin validación de entrada declarativa (sugerencia: `zod`); hoy hay validaciones a mano en los controladores.
 - Sin linter/formatter.
-- `appointmentService.scheduleAppointment` y `getAppointments` aún usan el patrón antiguo (`{ error }` / `try-catch` propio) en lugar de `AppError`.
-- Algunos `console.log` de depuración con emojis en `appointmentService`; sin logger.
+- Sin logger (`pino`); quedan algunos `console.log` sueltos.
 - Nombre de archivo inconsistente: `models/appointment.ts` frente a `User.ts` y `Schedule.ts`.
 - Campo `recurrent` y plantilla `resetPassword` sin uso.
 - Mezcla de idiomas en mensajes de respuesta (inglés y español).
@@ -63,3 +55,10 @@ Prioridad: 🔴 crítico · 🟠 importante · 🟡 menor.
 | — | `@types/express@5` con Express 4, `ts-node-dev` en dependencies | Corregido |
 | — | Resend fallaba al arrancar sin API key | Cliente perezoso; sin key se avisa en consola |
 | — | Sin tests ni CI | Vitest + Supertest + MongoDB en memoria; workflow de GitHub Actions |
+| F1 | “Mis citas” siempre devolvía 403 (roles en inglés) y respondía dos veces | Roles `paciente`/`psicologo`, `asyncHandler`; el populate ya no expone contraseñas ni emails ajenos; ordenado por fecha |
+| F4 | Cancelar guardaba `'cancelled'` (fuera del enum) | Guarda `'cancelada'` con validación; migración de los datos antiguos al arrancar |
+| F5 | Una franja cancelada no se podía volver a reservar (índice único) | Índice único **parcial** (solo citas pendientes o completadas) y las canceladas no cuentan como conflicto de horario |
+| F6 | Los errores de reserva respondían 201 | `AppError`: 400, 404 o 409 |
+| F10, F18 | No se podía completar una cita tras celebrarse; `update` permitía cambios arbitrarios | `update` solo marca `completada` (psicólogo o admin, cita pendiente y ya pasada); cancelar solo por su endpoint |
+| F15 | Reserva no atómica | `findOneAndUpdate` condicionado a `isAvailable: true`; si falla la creación, se libera la franja |
+| — | Cancelar dos veces liberaba una franja ya reservada de nuevo | La cancelación solo actúa sobre citas `pendiente` |

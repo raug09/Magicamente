@@ -33,7 +33,7 @@ erDiagram
     ObjectId _id
     ObjectId patientId
     ObjectId psychologistId
-    ObjectId scheduleId "único"
+    ObjectId scheduleId "único entre citas vivas"
     string state "pendiente | completada | cancelada"
     Date time "día + hora en UTC"
     string hour
@@ -76,13 +76,13 @@ Unicidad (`psychologist` + `day` + `hour`) solo se comprueba en código, no con 
 |---|---|---|---|
 | `patientId` | ObjectId → User | obligatorio | El usuario autenticado que reserva |
 | `psychologistId` | ObjectId → User | obligatorio | El dueño del horario reservado |
-| `scheduleId` | ObjectId → Schedule | obligatorio, **índice único** | Impide volver a reservar una franja cancelada (ver problemas) |
-| `state` | enum | `pendiente` (defecto), `completada`, `cancelada` | La cancelación escribe `'cancelled'`, fuera del enum |
+| `scheduleId` | ObjectId → Schedule | obligatorio, **índice único parcial** | Una franja solo puede tener una cita `pendiente` o `completada`; las `cancelada` no cuentan, así que se puede volver a reservar |
+| `state` | enum | `pendiente` (defecto), `completada`, `cancelada` | `pendiente → cancelada` (cancelar) o `pendiente → completada` (psicólogo, tras la cita). No hay más transiciones |
 | `time` | Date | obligatorio | `schedule.day` con `setUTCHours(hora, minutos)` |
 | `hour` | String | obligatorio | Copia de `schedule.hour` |
 | `reminderSent` | Boolean | defecto `false` | `true` cuando ya se envió el recordatorio (las citas antiguas sin el campo cuentan como no enviadas) |
 
-No hay `timestamps` en ningún modelo, ni borrado en cascada (borrar un usuario deja horarios y citas huérfanos).
+Los índices de `Appointment` los sincroniza `config/migrations.ts` al arrancar (`autoIndex` desactivado en ese esquema). No hay `timestamps` en ningún modelo, ni borrado en cascada (borrar un usuario deja horarios y citas huérfanos).
 
 ## Zonas horarias
 

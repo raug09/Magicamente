@@ -21,6 +21,7 @@ Magicamente/
         │   ├── env.ts               Lectura y validación de variables de entorno
         │   ├── db.ts                connectDB(uri)
         │   ├── cronJobs.ts          Recordatorios de citas (sendAppointmentReminders, startCronJobs)
+        │   ├── migrations.ts        Migración idempotente al arrancar (estados e índices de citas)
         │   └── emailTemplates.ts    Plantillas HTML de correo
         ├── middlewares/
         │   ├── auth.ts              isAuthenticated, requireRole, isAdmin, isSelfOrAdmin
@@ -70,15 +71,14 @@ Los servicios y controladores lanzan `new AppError(404, 'Usuario no encontrado')
 | JSON mal formado | 400 |
 | Cualquier otro | 500 `Error interno del servidor` (el detalle solo va al log) |
 
-Excepción pendiente: `getAppointments` y la creación de citas todavía usan el patrón antiguo (ver [06](06-problemas-conocidos.md)).
-
 ## Arranque (`src/index.ts`)
 
 1. `import 'dotenv/config'` en la primera línea carga `Backend/.env`.
 2. `assertRequiredEnv()`: si falta `JWT_SECRET`, el proceso termina con un mensaje claro.
 3. `connectDB(getMongoUri())`.
-4. `startCronJobs()` programa los recordatorios.
-5. `createApp().listen(PORT)`.
+4. `runMigrations()`: corrige citas `'cancelled'` → `'cancelada'` y sincroniza los índices de `Appointment`.
+5. `startCronJobs()` programa los recordatorios.
+6. `createApp().listen(PORT)`.
 
 `app.ts` no conecta a la base de datos ni arranca el cron: así los tests pueden montar la app con Supertest.
 
@@ -118,5 +118,5 @@ Roles: `paciente` (por defecto), `psicologo`, `administrador`. El registro públ
 
 - `tests/setup.ts` arranca una MongoDB en memoria (`mongodb-memory-server`), fija `JWT_SECRET` y vacía las colecciones tras cada test. La primera ejecución descarga el binario de MongoDB (~100 MB) desde fastdl.mongodb.org.
 - `tests/helpers.ts`: `createUser(rol)` crea usuarios directamente en la BD (incluidos administradores) y devuelve su token.
-- Ficheros: `auth`, `users`, `schedule`, `appointments`, `reminders` (con `sendEmail` simulado) y `env`.
+- Ficheros: `auth`, `users`, `schedule`, `appointments`, `migrations`, `reminders` (con `sendEmail` simulado) y `env`.
 - CI: `.github/workflows/backend.yml` ejecuta typecheck, build y tests en cada push y pull request.

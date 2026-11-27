@@ -33,7 +33,7 @@ npm run dev                  # desarrollo con recarga automática
 npm run build && npm start   # producción (compila a dist/)
 ```
 
-Deberías ver `Conectado a MongoDB` y `Servidor escuchando en el puerto 3000`. Si falta `JWT_SECRET`, el proceso termina con `Faltan variables de entorno obligatorias: JWT_SECRET`.
+Deberías ver `Conectado a MongoDB` y `Servidor escuchando en el puerto 3000`. Si tenías datos de una versión anterior, el arranque también los migra (citas `cancelled` → `cancelada` y el índice de franjas); verás `[migración] ...` en el log si cambió algo. Si falta `JWT_SECRET`, el proceso termina con `Faltan variables de entorno obligatorias: JWT_SECRET`.
 
 ## Tests
 
@@ -75,15 +75,20 @@ SCHEDULE_ID=$(curl -s -X POST $API/api/schedule -H "Authorization: Bearer $PSI_T
 curl -s $API/api/users/$PSI_ID -H "Authorization: Bearer $PAC_TOKEN"
 curl -s $API/api/schedule/$PSI_ID -H "Authorization: Bearer $PAC_TOKEN"
 
-# 6. Reservar: solo hace falta el scheduleId (revisa que no venga appointment.error)
+# 6. Reservar: solo hace falta el scheduleId
 APPOINTMENT_ID=$(curl -s -X POST $API/api/appointments/appointment -H "Authorization: Bearer $PAC_TOKEN" \
   -H 'Content-Type: application/json' -d "{\"scheduleId\":\"$SCHEDULE_ID\"}" | json appointment._id)
 
-# 7. Cancelar (paciente o psicólogo de la cita)
-curl -s -X PATCH $API/api/appointments/appointment/cancel/$APPOINTMENT_ID -H "Authorization: Bearer $PAC_TOKEN"
-```
+# 7. Mis citas (paciente o psicólogo)
+curl -s $API/api/appointments/appointment -H "Authorization: Bearer $PAC_TOKEN"
 
-“Mis citas” (`GET /api/appointments/appointment`) devuelve siempre 403 por un fallo pendiente. Mientras tanto, consulta la colección `appointments` en MongoDB.
+# 8. Cancelar (paciente o psicólogo de la cita); la franja queda libre para reservarse de nuevo
+curl -s -X PATCH $API/api/appointments/appointment/cancel/$APPOINTMENT_ID -H "Authorization: Bearer $PAC_TOKEN"
+
+# 9. Tras la sesión, el psicólogo la marca como completada
+curl -s -X PATCH $API/api/appointments/appointment/update/$APPOINTMENT_ID -H "Authorization: Bearer $PSI_TOKEN" \
+  -H 'Content-Type: application/json' -d '{"state":"completada"}'
+```
 
 ## Crear el primer administrador
 
@@ -113,5 +118,6 @@ Sin `RESEND_API_KEY` verás en consola `[email] RESEND_API_KEY no definido; no s
 | `401 Token no válido` | El token caducó (1 h) o `JWT_SECRET` cambió desde que se emitió |
 | `403` al editar un usuario | Solo puedes editar tu cuenta, y solo `name`, `description`, `studies`, `password` |
 | `403` al crear un horario | Solo los psicólogos (para sí mismos) o los administradores |
-| `409` al reservar | Esa franja ya se usó en una cita, aunque esté cancelada (fallo pendiente) |
+| `409` al reservar | La franja ya está ocupada, o ya tienes otra cita a esa hora |
+| `400` al cancelar | La cita ya no está `pendiente` (ya cancelada o completada) |
 | `npm test` se queda descargando o falla con `fastdl.mongodb.org` | Sin acceso a internet o host bloqueado por la red |

@@ -19,10 +19,10 @@ Leyenda: ✅ funciona · ⚠️ funciona con salvedades · ❌ roto (detalles en
 | DELETE | `/api/users/:id` | 🔒 uno mismo o admin | Borrar usuario | ⚠️ no borra en cascada |
 | POST | `/api/schedule` | 🔒 psicólogo o admin | Crear franja horaria | ✅ |
 | GET | `/api/schedule/:psychologistId` | 🔒 | Franjas de un psicólogo | ✅ |
-| GET | `/api/appointments/appointment` | 🔒 | Mis citas | ❌ siempre 403 |
-| POST | `/api/appointments/appointment` | 🔒 paciente | Reservar cita | ⚠️ errores con 201 |
-| PATCH | `/api/appointments/appointment/cancel/:id` | 🔒 participante o admin | Cancelar cita | ⚠️ |
-| PATCH | `/api/appointments/appointment/update/:id` | 🔒 participante o admin | Cambiar estado | ⚠️ |
+| GET | `/api/appointments/appointment` | 🔒 paciente o psicólogo | Mis citas | ✅ |
+| POST | `/api/appointments/appointment` | 🔒 paciente | Reservar cita | ✅ |
+| PATCH | `/api/appointments/appointment/cancel/:id` | 🔒 participante o admin | Cancelar cita | ✅ |
+| PATCH | `/api/appointments/appointment/update/:id` | 🔒 psicólogo de la cita o admin | Marcar como completada | ✅ |
 
 “Participante” = el paciente o el psicólogo de esa cita. La ruta de citas repite el nombre: `/api/appointments/appointment`.
 
@@ -112,24 +112,44 @@ Array con **todas** las franjas del psicólogo (pasadas y ocupadas incluidas). F
 ```
 
 - El paciente es siempre el usuario autenticado y el psicólogo, el dueño del horario. Si el body trae `patientId` o `psychologistId`, se ignoran.
-- Calcula `time` = `schedule.day` + `schedule.hour` (UTC), crea la cita `pendiente` y marca el horario `isAvailable=false`.
-- `201 { "message": "Appointment scheduled successfully", "appointment": {...} }`.
-- ⚠️ Los errores de negocio **también responden 201**, con `appointment: { "error": "..." }`: `"El horario no existe."`, `"Este horario ya está ocupado."`, `"No puedes agendar citas en fechas pasadas."`, `"Ya tienes una cita programada en este horario."`. El cliente debe mirar `appointment.error`.
-- `409` si esa franja ya se usó antes en otra cita, aunque esa cita se cancelara (índice único).
+- Calcula `time` = `schedule.day` + `schedule.hour` (UTC), crea la cita `pendiente` y marca la franja como ocupada de forma atómica.
+- `201 { "message": "Cita agendada correctamente", "appointment": {...} }`.
+- Errores:
 
-### `GET /api/appointments/appointment` 🔒 ❌
-Debería devolver tus citas. **Siempre responde `403`** porque compara el rol con `'patient'`/`'psychologist'` en vez de `'paciente'`/`'psicologo'`.
+| Código | Motivo |
+|---|---|
+| 400 | Falta `scheduleId`, id mal formado o franja en el pasado |
+| 403 | No eres paciente |
+| 404 | La franja no existe |
+| 409 | La franja ya está ocupada, o ya tienes otra cita a esa misma hora |
 
-### `PATCH /api/appointments/appointment/cancel/:id` 🔒 participante o admin
-Sin body. Pone el estado a `'cancelled'` (valor fuera del enum, pendiente de corregir) y libera el horario.
-`200 { "message": "Appointment canceled successfully", "appointment": {...} }` · `403` si no es tu cita · `404` si no existe.
+- Una franja cancelada vuelve a estar disponible y se puede reservar de nuevo (por el mismo paciente o por otro). Las citas canceladas no cuentan como conflicto de horario.
+- Si dos pacientes reservan a la vez la misma franja, uno recibe 201 y el otro 409.
 
-### `PATCH /api/appointments/appointment/update/:id` 🔒 participante o admin
+### `GET /api/appointments/appointment` 🔒 paciente o psicólogo
+
+Devuelve **tus** citas ordenadas por fecha, con la franja (`scheduleId`) incluida:
+
+- Paciente: cada cita trae `psychologistId` con `name`, `studies` y `description`.
+- Psicólogo: cada cita trae `patientId` con `name` y `email`.
+- Nunca se incluye la contraseña.
+- Un administrador recibe `403` (no tiene citas propias).
+
+### `PATCH /api/appointments/appointment/cancel/:id` 🔒 paciente o psicólogo de la cita, o admin
+
+Sin body. Pasa la cita a `cancelada` y libera la franja.
+
+- `200 { "message": "Cita cancelada correctamente", "appointment": {...} }`.
+- `400` si la cita no está `pendiente` (ya cancelada o completada) · `403` si no es tu cita · `404` si no existe.
+
+### `PATCH /api/appointments/appointment/update/:id` 🔒 psicólogo de la cita o admin
+
+Único cambio permitido: marcar la cita como completada.
 
 ```json
 { "state": "completada" }
 ```
 
-- Solo se admite `state` (`pendiente`, `completada`, `cancelada`). Otro campo → `403`; otro valor → `400`.
-- Solo si faltan más de 24 h para la cita → si no, `400`. Por eso todavía no se puede marcar como `completada` después de la sesión.
 - `200 { "message": "Cita actualizada correctamente", "updatedAppointment": {...} }`.
+- `400`: la cita no está `pendiente`, todavía no ha ocurrido, o `state` no es `completada` (para cancelar hay que usar el endpoint de cancelar).
+- `403`: otro campo en el body, o no eres el psicólogo de la cita (el paciente tampoco puede).

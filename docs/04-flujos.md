@@ -33,29 +33,41 @@ Cada franja es un hueco único (una fecha y una hora). El campo `recurrent` exis
 
 ```mermaid
 flowchart TD
-  A[POST /api/appointments/appointment<br/>solo rol paciente, body: scheduleId] --> B{¿Existe schedule?}
-  B -- no --> X1[error: El horario no existe]
+  A[POST /api/appointments/appointment<br/>solo rol paciente, body: scheduleId] --> B{¿Existe la franja?}
+  B -- no --> X1[404]
   B -- sí --> C{¿isAvailable?}
-  C -- no --> X2[error: ocupado]
+  C -- no --> X2[409 ocupada]
   C -- sí --> D[time = day + hour en UTC]
   D --> E{¿time en el pasado?}
-  E -- sí --> X3[error: fecha pasada]
-  E -- no --> F{¿paciente ya tiene cita a esa hora?}
-  F -- sí --> X4[error: duplicada]
-  F -- no --> G[crear Appointment 'pendiente'<br/>paciente = token, psicólogo = dueño del horario]
-  G --> H[schedule.isAvailable = false]
+  E -- sí --> X3[400]
+  E -- no --> F{¿el paciente ya tiene otra cita viva a esa hora?}
+  F -- sí --> X4[409]
+  F -- no --> G[marcar franja ocupada<br/>findOneAndUpdate atómico]
+  G -- otro llegó antes --> X2
+  G --> H[crear Appointment 'pendiente'<br/>paciente = token, psicólogo = dueño de la franja]
+  H -- falla --> R[liberar la franja y propagar el error]
   H --> OK[201]
 ```
 
-Todos los `error` salen con código **201** (ver problemas). La comprobación de disponibilidad y la creación no son atómicas: dos reservas simultáneas pueden pasar la validación, aunque el índice único de `scheduleId` hará fallar a la segunda con un 500.
+La reserva es atómica: la franja se marca ocupada con una sola operación condicionada a `isAvailable: true`, así que si dos pacientes llegan a la vez solo uno recibe 201 y el otro 409. Si crear la cita falla después, la franja se libera.
 
 **¿Cómo encuentra el paciente a un psicólogo?** Si conoce su id, puede ver su perfil público con `GET /api/users/:id`. Pero todavía no hay un listado de psicólogos (`GET /api/users` es solo para administradores). Hay que añadirlo (ver hoja de ruta).
 
-## 4. Modificar o cancelar
+## 4. Ver, cancelar y completar
 
-- **Cancelar**: estado → `'cancelled'` y la franja vuelve a estar disponible. Pero esa franja ya no se puede volver a reservar por el índice único de `scheduleId`.
-- **Modificar**: solo el campo `state` (`pendiente`, `completada`, `cancelada`) y solo si faltan más de 24 h. Pasar a `cancelada` por aquí no libera la franja: para cancelar usa el endpoint de cancelación.
-- Ambas solo las puede hacer el paciente o el psicólogo de la cita, o un administrador (si no, 403).
+```mermaid
+stateDiagram-v2
+  [*] --> pendiente: reservar
+  pendiente --> cancelada: cancelar (paciente, psicólogo o admin)
+  pendiente --> completada: psicólogo/admin, una vez pasada la hora
+  cancelada --> [*]
+  completada --> [*]
+```
+
+- **Mis citas** (`GET /appointment`): el paciente ve las suyas con los datos públicos del psicólogo; el psicólogo ve las suyas con nombre y email del paciente.
+- **Cancelar**: solo citas `pendiente`. Pasa a `cancelada` y la franja vuelve a quedar disponible (se puede reservar otra vez). Cancelar una cita que ya no está `pendiente` devuelve 400; esto evita que una segunda cancelación libere una franja que otro paciente ya reservó.
+- **Completar** (`PATCH /appointment/update/:id` con `{ "state": "completada" }`): solo el psicólogo de la cita (o un administrador), solo si está `pendiente` y su hora ya pasó.
+- Cancelar, completar y consultar solo las puede hacer el paciente o el psicólogo de la cita, o un administrador (si no, 403).
 
 ## 5. Recordatorios automáticos (`config/cronJobs.ts`)
 
