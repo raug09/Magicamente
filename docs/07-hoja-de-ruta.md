@@ -82,7 +82,7 @@ Pendiente de probar de extremo a extremo: los correos reales (hace falta `RESEND
 
 ## Pendientes de producto
 
-- [x] Subida de documentos a Cloudflare R2 (privado, enlaces de 5 minutos, accesos registrados, 30 días de retención para rechazados). Falta probarla contra R2 real con las credenciales.
+- [x] Subida de documentos a Cloudflare R2 (privado, enlaces de 5 minutos, accesos registrados, 30 días de retención para rechazados). Probada contra R2 real (subir, enlace temporal, bucket privado, borrar): `.github/workflows/r2-smoke.yml`.
 - [ ] Revisar con un abogado la política de datos: consentimiento para tratar documentos de identidad (Ley 1581) y plazo de retención de los aprobados.
 
 - [ ] **Pago de las citas.** No existe ningún cobro. Hay que decidir: ¿quién cobra (la plataforma o el psicólogo)?, ¿cuándo (al reservar o antes de la cita)?, ¿qué pasa con cancelaciones y reembolsos?, ¿qué pasarela (Stripe, MercadoPago, Wompi u otra) y en qué países?, ¿comisión de la plataforma?
