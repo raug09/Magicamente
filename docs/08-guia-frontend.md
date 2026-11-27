@@ -100,14 +100,14 @@ El mensaje de `forgot-password` es siempre el mismo: **muestra “Si el email ex
 
 ```http
 GET /api/psychologists?q=ana&page=1&limit=20
-→ 200 { "total": 3, "page": 1, "limit": 20,
-        "psychologists": [ { "_id", "name", "studies": [], "description" } ] }
+→ 200 { "total": 3, "page": 1, "limit": 20, "pages": 1,
+        "items": [ { "_id", "name", "studies": [], "description" } ] }
    (limit máx. 50; solo psicólogos activos; orden por nombre; sin email)
 
-GET /api/schedule/:psychologistId?available=true&from=2026-12-01&to=2026-12-31
-→ 200 [ { "_id", "psychologist", "day": "2026-12-15T00:00:00.000Z", "hour": "10:00",
+GET /api/schedule/:psychologistId?available=true&from=2026-12-01&to=2026-12-31&page=1&limit=20
+→ 200 { "total", "page", "limit", "pages", "items": [ { "_id", "psychologist", "day": "2026-12-15T00:00:00.000Z", "hour": "10:00",
           "timezone": "America/Bogota", "startsAt": "2026-12-15T15:00:00.000Z",
-          "isAvailable": true, "createdAt" } ]
+          "isAvailable": true, "createdAt" } ] }
    (ordenadas por startsAt; available=true = libres y que aún no han empezado;
     from/to se refieren al día del calendario del psicólogo, formato YYYY-MM-DD)
 
@@ -122,13 +122,16 @@ Solo se envía `scheduleId`: el paciente sale del token y el psicólogo, de la f
 ### Mis citas
 
 ```http
-GET /api/appointments/appointment
-→ 200 [ { "_id", "state", "time", "hour", "scheduleId": { …franja completa… },
-          "psychologistId": { "_id", "name", "studies", "description" }   ← si eres paciente
-          "patientId":      { "_id", "name", "email" }                    ← si eres psicólogo
-        } ]   (ordenadas por fecha ascendente)
+GET /api/appointments/appointment?page=1&limit=20
+→ 200 { "total": 42, "page": 1, "limit": 20, "pages": 3,
+        "items": [ { "_id", "state", "time", "hour", "scheduleId": { …franja completa… },
+                     "psychologistId": { "_id", "name", "studies", "description" }   ← si eres paciente
+                     "patientId":      { "_id", "name", "email" }                    ← si eres psicólogo
+                   } ] }   (ordenadas por fecha ascendente)
 → 403 si eres administrador
 ```
+
+⚠️ **Las listas ya no son arrays**: “mis citas”, las franjas de un psicólogo y el listado de psicólogos devuelven `{ total, page, limit, pages, items }`. Lee `items` y usa `pages` para la paginación.
 
 ```http
 PATCH /api/appointments/appointment/cancel/:id         → 200 { "message", "appointment" }

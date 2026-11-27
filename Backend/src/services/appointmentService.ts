@@ -4,6 +4,7 @@ import User from '../models/User';
 import { slotStart, updateAvailabilitySchedule } from './scheduleService';
 import { AuthUser } from '../middlewares/auth';
 import { AppError } from '../utils/AppError';
+import { skipFor, toPage } from '../utils/pagination';
 
 /**
  * Devuelve la cita si quien la pide es su paciente, su psicólogo o un administrador.
@@ -122,16 +123,28 @@ export const cancelAppointment = async (appointmentId: string, user: AuthUser) =
   return appointment;
 };
 
-export const getAppointmentsByPatient = async (patientId: string) => {
-  return Appointment.find({ patientId })
-    .sort({ time: 1 })
-    .populate('scheduleId')
-    .populate('psychologistId', 'name studies description');
+export const getAppointmentsByPatient = async (patientId: string, page = 1, limit = 20) => {
+  const [total, items] = await Promise.all([
+    Appointment.countDocuments({ patientId }),
+    Appointment.find({ patientId })
+      .sort({ time: 1 })
+      .skip(skipFor(page, limit))
+      .limit(limit)
+      .populate('scheduleId')
+      .populate('psychologistId', 'name studies description'),
+  ]);
+  return toPage(items, total, page, limit);
 };
 
-export const getAppointmentsByPsychologist = async (psychologistId: string) => {
-  return Appointment.find({ psychologistId })
-    .sort({ time: 1 })
-    .populate('scheduleId')
-    .populate('patientId', 'name email');
+export const getAppointmentsByPsychologist = async (psychologistId: string, page = 1, limit = 20) => {
+  const [total, items] = await Promise.all([
+    Appointment.countDocuments({ psychologistId }),
+    Appointment.find({ psychologistId })
+      .sort({ time: 1 })
+      .skip(skipFor(page, limit))
+      .limit(limit)
+      .populate('scheduleId')
+      .populate('patientId', 'name email'),
+  ]);
+  return toPage(items, total, page, limit);
 };

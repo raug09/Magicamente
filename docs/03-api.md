@@ -31,10 +31,10 @@ Leyenda: ✅ funciona · ⚠️ funciona con salvedades · ❌ roto (detalles en
 | DELETE | `/api/users/:id` | 🔒 uno mismo o admin | Eliminar cuenta (anonimiza y limpia sus citas y franjas) | ✅ |
 | POST | `/api/schedule` | 🔒 psicólogo o admin | Crear franja horaria | ✅ |
 | GET | `/api/psychologists` | 🔒 | Listado de psicólogos (búsqueda y paginación) | ✅ |
-| GET | `/api/schedule/:psychologistId` | 🔒 | Franjas de un psicólogo (con filtros) | ✅ |
+| GET | `/api/schedule/:psychologistId` | 🔒 | Franjas de un psicólogo (con filtros y paginación) | ✅ |
 | PUT | `/api/schedule/:id` | 🔒 su psicólogo o admin | Cambiar día/hora de una franja libre | ✅ |
 | DELETE | `/api/schedule/:id` | 🔒 su psicólogo o admin | Borrar una franja libre | ✅ |
-| GET | `/api/appointments/appointment` | 🔒 paciente o psicólogo | Mis citas | ✅ |
+| GET | `/api/appointments/appointment` | 🔒 paciente o psicólogo | Mis citas (paginadas) | ✅ |
 | POST | `/api/appointments/appointment` | 🔒 paciente | Reservar cita | ✅ |
 | PATCH | `/api/appointments/appointment/cancel/:id` | 🔒 participante o admin | Cancelar cita | ✅ |
 | PATCH | `/api/appointments/appointment/update/:id` | 🔒 psicólogo de la cita o admin | Marcar como completada | ✅ |
@@ -189,7 +189,8 @@ Listado de psicólogos **activos** para que un paciente elija. Lo puede usar cua
   "total": 3,
   "page": 1,
   "limit": 20,
-  "psychologists": [
+  "pages": 1,
+  "items": [
     { "_id": "6740...", "name": "Ana Pérez", "studies": ["Psicología clínica"], "description": "Terapia cognitiva" }
   ]
 }
@@ -232,9 +233,11 @@ Franjas de un psicólogo, **ordenadas por instante de inicio (`startsAt`)**. Fil
 
 Ejemplo: `GET /api/schedule/6740...?available=true&from=2026-12-01&to=2026-12-31`
 
-- Sin parámetros devuelve todas (pasadas y ocupadas incluidas).
-- `400` si `available` no es `true`/`false`, si las fechas no tienen formato `YYYY-MM-DD` o si `from` es posterior a `to`, o si el id está mal formado.
-- Un psicólogo que no existe devuelve `[]`.
+Paginación: `page` (desde 1, por defecto 1) y `limit` (por defecto 20, máximo 50). Ver [formato de las listas](#listas-paginadas).
+
+- Sin filtros devuelve todas (pasadas y ocupadas incluidas).
+- `400` si `available` no es `true`/`false`, si las fechas no tienen formato `YYYY-MM-DD`, si `from` es posterior a `to`, si `page`/`limit` no son enteros positivos, o si el id está mal formado.
+- Un psicólogo que no existe devuelve una lista vacía (`items: []`, `total: 0`).
 
 ### `PUT /api/schedule/:id` 🔒 su psicólogo o admin
 
@@ -279,9 +282,24 @@ Borra una franja **libre** y la quita de la lista del psicólogo.
 - Una franja cancelada vuelve a estar disponible y se puede reservar de nuevo (por el mismo paciente o por otro). Las citas canceladas no cuentan como conflicto de horario.
 - Si dos pacientes reservan a la vez la misma franja, uno recibe 201 y el otro 409.
 
+### Listas paginadas
+
+Todas las listas que pueden crecer usan el mismo formato:
+
+```json
+{ "total": 42, "page": 2, "limit": 20, "pages": 3, "items": [ … ] }
+```
+
+- `total`: cuántos elementos hay en total con los filtros aplicados.
+- `pages`: número de páginas (mínimo 1).
+- `items`: los elementos de la página pedida. Una página fuera de rango devuelve `items: []`.
+- `page` (desde 1, por defecto 1) y `limit` (por defecto 20, máximo 50; un valor mayor se recorta a 50). Valores no válidos → `400`.
+
+Listas paginadas: `GET /api/psychologists`, `GET /api/schedule/:psychologistId` y `GET /api/appointments/appointment`.
+
 ### `GET /api/appointments/appointment` 🔒 paciente o psicólogo
 
-Devuelve **tus** citas ordenadas por fecha, con la franja (`scheduleId`) incluida:
+Devuelve **tus** citas ordenadas por fecha, paginadas (`page`, `limit`; ver [formato de las listas](#listas-paginadas)), con la franja (`scheduleId`) incluida:
 
 - Paciente: cada cita trae `psychologistId` con `name`, `studies` y `description`.
 - Psicólogo: cada cita trae `patientId` con `name` y `email`.

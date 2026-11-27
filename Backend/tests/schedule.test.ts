@@ -75,7 +75,7 @@ describe('GET /api/schedule/:psychologistId', () => {
 
     const res = await request(app).get(`/api/schedule/${psychologist.id}`).set(auth(patient));
     expect(res.status).toBe(200);
-    expect(res.body).toHaveLength(1);
+    expect(res.body.items).toHaveLength(1);
   });
 });
 
@@ -102,8 +102,8 @@ describe('GET /api/schedule/:psychologistId (filtros)', () => {
     const { psychologist, patient } = await seed();
     const res = await get(patient, psychologist.id);
     expect(res.status).toBe(200);
-    expect(res.body).toHaveLength(6);
-    const keys = res.body.map((s: { day: string; hour: string }) => `${s.day}${s.hour}`);
+    expect(res.body.items).toHaveLength(6);
+    const keys = res.body.items.map((s: { day: string; hour: string }) => `${s.day}${s.hour}`);
     expect(keys).toEqual([...keys].sort());
   });
 
@@ -111,16 +111,16 @@ describe('GET /api/schedule/:psychologistId (filtros)', () => {
     const { psychologist, patient } = await seed();
     const res = await get(patient, psychologist.id, '?available=true');
     expect(res.status).toBe(200);
-    expect(res.body).toHaveLength(3);
-    expect(res.body.every((s: { isAvailable: boolean }) => s.isAvailable)).toBe(true);
-    expect(res.body.map((s: { hour: string }) => s.hour)).toEqual(['09:00', '11:00', '09:00']);
+    expect(res.body.items).toHaveLength(3);
+    expect(res.body.items.every((s: { isAvailable: boolean }) => s.isAvailable)).toBe(true);
+    expect(res.body.items.map((s: { hour: string }) => s.hour)).toEqual(['09:00', '11:00', '09:00']);
   });
 
   it('available=false devuelve solo las ocupadas', async () => {
     const { psychologist, patient } = await seed();
     const res = await get(patient, psychologist.id, '?available=false');
-    expect(res.body).toHaveLength(1);
-    expect(res.body[0].isAvailable).toBe(false);
+    expect(res.body.items).toHaveLength(1);
+    expect(res.body.items[0].isAvailable).toBe(false);
   });
 
   it('from y to acotan por día, ambos incluidos', async () => {
@@ -282,8 +282,8 @@ describe('zona horaria del psicólogo', () => {
     await create(psychologist, { day: futureDay(5), hour: '10:00' });
 
     const res = await request(app).get(`/api/schedule/${psychologist.id}?available=true`).set(auth(patient));
-    expect(res.body).toHaveLength(1);
-    expect(res.body[0].startsAt).toBe(`${futureDay(5)}T10:00:00.000Z`);
+    expect(res.body.items).toHaveLength(1);
+    expect(res.body.items[0].startsAt).toBe(`${futureDay(5)}T10:00:00.000Z`);
   });
 
   it('se puede crear una franja para el día de hoy del psicólogo si todavía no ha empezado', async () => {

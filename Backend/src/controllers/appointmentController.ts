@@ -15,14 +15,15 @@ export const cancelAppointment = async (req: Request, res: Response) => {
   res.status(200).json({ message: 'Cita cancelada correctamente', appointment });
 };
 
-/** Citas del usuario autenticado: las suyas como paciente o como psicólogo. */
+/** Citas del usuario autenticado (paciente o psicólogo), paginadas: ?page=&limit= */
 export const getAppointments = async (req: Request, res: Response) => {
   const { id, role } = req.user!;
+  const { page, limit } = req.query as unknown as { page: number; limit: number };
 
   if (role === 'paciente') {
-    res.status(200).json(await appointmentService.getAppointmentsByPatient(id));
+    res.status(200).json(await appointmentService.getAppointmentsByPatient(id, page, limit));
   } else if (role === 'psicologo') {
-    res.status(200).json(await appointmentService.getAppointmentsByPsychologist(id));
+    res.status(200).json(await appointmentService.getAppointmentsByPsychologist(id, page, limit));
   } else {
     throw new AppError(403, 'Solo pacientes y psicólogos tienen citas propias');
   }

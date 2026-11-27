@@ -24,9 +24,9 @@ describe('GET /api/psychologists', () => {
     const res = await list(patient);
     expect(res.status).toBe(200);
     expect(res.body.total).toBe(1);
-    expect(res.body.psychologists).toHaveLength(1);
+    expect(res.body.items).toHaveLength(1);
 
-    const [psychologist] = res.body.psychologists;
+    const [psychologist] = res.body.items;
     expect(psychologist).toMatchObject({ name: 'Ana', studies: ['Clínica'], description: 'Terapia cognitiva' });
     expect(psychologist._id).toBeTruthy();
     expect(psychologist.email).toBeUndefined();
@@ -41,7 +41,7 @@ describe('GET /api/psychologists', () => {
     await createPsychologist('Inactiva', { isActive: false });
 
     const res = await list(patient);
-    expect(res.body.psychologists.map((p: { name: string }) => p.name)).toEqual(['Activa']);
+    expect(res.body.items.map((p: { name: string }) => p.name)).toEqual(['Activa']);
   });
 
   it('ordena por nombre y busca sin distinguir mayúsculas', async () => {
@@ -51,7 +51,7 @@ describe('GET /api/psychologists', () => {
     await createPsychologist('Beatriz Ruiz');
 
     const all = await list(patient);
-    expect(all.body.psychologists.map((p: { name: string }) => p.name)).toEqual([
+    expect(all.body.items.map((p: { name: string }) => p.name)).toEqual([
       'Ana Pérez',
       'Beatriz Ruiz',
       'Carlos Ruiz',
@@ -59,7 +59,7 @@ describe('GET /api/psychologists', () => {
 
     const found = await list(patient, '?q=ruiz');
     expect(found.body.total).toBe(2);
-    expect(found.body.psychologists.map((p: { name: string }) => p.name)).toEqual(['Beatriz Ruiz', 'Carlos Ruiz']);
+    expect(found.body.items.map((p: { name: string }) => p.name)).toEqual(['Beatriz Ruiz', 'Carlos Ruiz']);
   });
 
   it('la búsqueda trata el texto literalmente (no como expresión regular)', async () => {
@@ -78,9 +78,9 @@ describe('GET /api/psychologists', () => {
     const page9 = await list(patient, '?limit=2&page=9');
 
     expect(page1.body).toMatchObject({ total: 5, page: 1, limit: 2 });
-    expect(page1.body.psychologists.map((p: { name: string }) => p.name)).toEqual(['A', 'B']);
-    expect(page3.body.psychologists.map((p: { name: string }) => p.name)).toEqual(['E']);
-    expect(page9.body.psychologists).toEqual([]);
+    expect(page1.body.items.map((p: { name: string }) => p.name)).toEqual(['A', 'B']);
+    expect(page3.body.items.map((p: { name: string }) => p.name)).toEqual(['E']);
+    expect(page9.body.items).toEqual([]);
   });
 
   it('limita el tamaño de página y valida los parámetros', async () => {

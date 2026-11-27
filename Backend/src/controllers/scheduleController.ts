@@ -35,19 +35,27 @@ export const createSchedule = async (req: Request, res: Response) => {
 };
 
 /**
- * Franjas de un psicólogo, ordenadas por instante de inicio.
+ * Franjas de un psicólogo, ordenadas por instante de inicio, paginadas (?page=&limit=).
  *   ?available=true   solo libres y que aún no han empezado · ?available=false solo ocupadas
  *   ?from=YYYY-MM-DD  desde ese día (incluido) · ?to=YYYY-MM-DD hasta ese día (incluido)
  */
 export const getSchedulesByPsychologist = async (req: Request, res: Response) => {
-  const { available, from, to } = req.query as { available?: boolean; from?: string; to?: string };
+  const { available, from, to, page, limit } = req.query as unknown as {
+    available?: boolean;
+    from?: string;
+    to?: string;
+    page: number;
+    limit: number;
+  };
 
-  const schedules = await scheduleService.listSchedules(req.params.psychologistId, {
+  const result = await scheduleService.listSchedules(req.params.psychologistId, {
     available,
     from: from ? new Date(`${from}T00:00:00.000Z`) : undefined,
     to: to ? new Date(`${to}T00:00:00.000Z`) : undefined,
+    page,
+    limit,
   });
-  res.status(200).json(schedules);
+  res.status(200).json(result);
 };
 
 /** Cambia el día y/o la hora de una franja libre propia. */

@@ -1,3 +1,4 @@
+import { toPage } from '../utils/pagination';
 import User from '../models/User';
 
 export interface ListPsychologistsOptions {
@@ -31,5 +32,5 @@ export const listPsychologists = async ({ q, page, limit }: ListPsychologistsOpt
       .limit(limit),
   ]);
 
-  return { total, page, limit, psychologists };
+  return toPage(psychologists, total, page, limit);
 };

@@ -3,12 +3,12 @@ import { scheduleAppointment, cancelAppointment, getAppointments, updateAppointm
 import { isAuthenticated, requireRole } from '../middlewares/auth';
 import { asyncHandler } from '../middlewares/asyncHandler';
 import { validate } from '../validation/validate';
-import { createAppointmentSchema, updateAppointmentSchema } from '../validation/schemas';
+import { createAppointmentSchema, listAppointmentsQuery, updateAppointmentSchema } from '../validation/schemas';
 
 const router = Router();
 
 // Mis citas (paciente o psicólogo).
-router.get('/appointment', isAuthenticated, asyncHandler(getAppointments));
+router.get('/appointment', isAuthenticated, validate({ query: listAppointmentsQuery }), asyncHandler(getAppointments));
 // Solo pacientes reservan; el paciente es siempre el usuario autenticado.
 router.post('/appointment', isAuthenticated, requireRole('paciente'), validate({ body: createAppointmentSchema }), asyncHandler(scheduleAppointment));
 // Cancelar: paciente o psicólogo de la cita, o administrador.

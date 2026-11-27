@@ -103,12 +103,17 @@ const positiveInt = (name: string) =>
 
 export const MAX_PAGE_SIZE = 50;
 
-export const listPsychologistsQuery = z.object({
-  q: z.string({ invalid_type_error: 'q debe ser un texto' }).trim().max(100, 'q es demasiado largo').optional(),
+/** Paginación compartida: `page` desde 1, `limit` por defecto 20 y máximo 50. */
+export const pagination = {
   page: positiveInt('page').default('1'),
   limit: positiveInt('limit')
     .default('20')
     .transform((value) => Math.min(value, MAX_PAGE_SIZE)),
+};
+
+export const listPsychologistsQuery = z.object({
+  q: z.string({ invalid_type_error: 'q debe ser un texto' }).trim().max(100, 'q es demasiado largo').optional(),
+  ...pagination,
 });
 
 // --- Franjas -------------------------------------------------------------------------------
@@ -138,6 +143,7 @@ export const listSchedulesQuery = z
       .optional(),
     from: dayField.optional(),
     to: dayField.optional(),
+    ...pagination,
   })
   .refine((query) => !query.from || !query.to || query.from <= query.to, { message: 'from no puede ser posterior a to' });
 
@@ -147,3 +153,5 @@ export const createAppointmentSchema = z.object({ scheduleId: text('scheduleId',
 
 /** El servicio decide qué estados se aceptan; aquí solo el tipo. Otros campos pasan para dar 403. */
 export const updateAppointmentSchema = z.object({ state: z.string({ invalid_type_error: 'state debe ser un texto' }).optional() }).passthrough();
+
+export const listAppointmentsQuery = z.object({ ...pagination });

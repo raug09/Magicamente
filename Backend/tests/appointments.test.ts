@@ -166,11 +166,11 @@ describe('GET /api/appointments/appointment (mis citas)', () => {
 
     const res = await request(app).get('/api/appointments/appointment').set(auth(patient));
     expect(res.status).toBe(200);
-    expect(res.body).toHaveLength(1);
-    expect(res.body[0].psychologistId.name).toBeTruthy();
-    expect(res.body[0].psychologistId.password).toBeUndefined();
-    expect(res.body[0].psychologistId.email).toBeUndefined();
-    expect(res.body[0].scheduleId.hour).toBe('10:00');
+    expect(res.body.items).toHaveLength(1);
+    expect(res.body.items[0].psychologistId.name).toBeTruthy();
+    expect(res.body.items[0].psychologistId.password).toBeUndefined();
+    expect(res.body.items[0].psychologistId.email).toBeUndefined();
+    expect(res.body.items[0].scheduleId.hour).toBe('10:00');
   });
 
   it('el psicólogo ve las citas de sus pacientes ordenadas por fecha', async () => {
@@ -183,10 +183,10 @@ describe('GET /api/appointments/appointment (mis citas)', () => {
 
     const res = await request(app).get('/api/appointments/appointment').set(auth(psychologist));
     expect(res.status).toBe(200);
-    expect(res.body).toHaveLength(2);
-    expect(new Date(res.body[0].time) < new Date(res.body[1].time)).toBe(true);
-    expect(res.body[0].patientId.email).toBe(patient.email);
-    expect(res.body[0].patientId.password).toBeUndefined();
+    expect(res.body.items).toHaveLength(2);
+    expect(new Date(res.body.items[0].time) < new Date(res.body.items[1].time)).toBe(true);
+    expect(res.body.items[0].patientId.email).toBe(patient.email);
+    expect(res.body.items[0].patientId.password).toBeUndefined();
   });
 
   it('un administrador no tiene citas propias (403) y sin sesión da 401', async () => {

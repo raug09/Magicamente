@@ -4,6 +4,7 @@ import { AuthUser } from '../middlewares/auth';
 import { AppError } from '../utils/AppError';
 import { getAppTimezone } from '../config/env';
 import { weeklyOccurrences, zonedTimeToUtc } from '../utils/timezone';
+import { skipFor, toPage } from '../utils/pagination';
 
 export interface CreateScheduleInput {
   psychologist: string;
@@ -16,6 +17,8 @@ export interface CreateScheduleInput {
 }
 
 export interface ListSchedulesFilter {
+  page?: number;
+  limit?: number;
   /** true: solo franjas libres y futuras; false: solo las ocupadas; undefined: todas. */
   available?: boolean;
   /** Primer día incluido (medianoche UTC), referido al calendario del psicólogo. */
@@ -81,8 +84,8 @@ export const createSchedules = async ({ psychologist, day, hour, repeatWeeks = 1
   return { schedules, skipped };
 };
 
-/** Franjas de un psicólogo ordenadas por instante de inicio, con filtros opcionales. */
-export const listSchedules = async (psychologist: string, { available, from, to }: ListSchedulesFilter = {}) => {
+/** Franjas de un psicólogo ordenadas por instante de inicio, con filtros opcionales y paginación. */
+export const listSchedules = async (psychologist: string, { available, from, to, page = 1, limit = 20 }: ListSchedulesFilter = {}) => {
   const filter: Record<string, unknown> = { psychologist };
   if (available !== undefined) filter.isAvailable = available;
   // "Disponible" también significa que todavía no ha empezado (no se pueden reservar franjas pasadas).
@@ -93,11 +96,12 @@ export const listSchedules = async (psychologist: string, { available, from, to 
   if (to) day.$lte = to;
   if (Object.keys(day).length > 0) filter.day = day;
 
-  return Schedule.find(filter).sort({ startsAt: 1 });
+  const [total, items] = await Promise.all([
+    Schedule.countDocuments(filter),
+    Schedule.find(filter).sort({ startsAt: 1 }).skip(skipFor(page, limit)).limit(limit),
+  ]);
+  return toPage(items, total, page, limit);
 };
-
-/** Mantengo el nombre anterior por compatibilidad. */
-export const getScheduleById = listSchedules;
 
 export const updateAvailabilitySchedule = async (scheduleId: string, isAvailable: boolean) => {
   await Schedule.findByIdAndUpdate(scheduleId, { isAvailable });
