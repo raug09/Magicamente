@@ -72,7 +72,12 @@ test('recuperar contraseña: pide el enlace sin revelar si la cuenta existe', as
   await page.getByRole('link', { name: '¿Olvidaste tu contraseña?' }).click();
   await expect(page).toHaveURL(/\/recuperar$/);
   await page.getByLabel('Email').fill('no-existe.e2e@example.com');
-  await page.getByRole('button', { name: 'Enviar enlace' }).click();
+  // Esperamos la respuesta real del servidor (así un fallo muestra el estado, no un timeout genérico).
+  const [response] = await Promise.all([
+    page.waitForResponse((r) => r.url().includes('/api/auth/forgot-password')),
+    page.getByRole('button', { name: 'Enviar enlace' }).click(),
+  ]);
+  expect(response.status()).toBe(200);
   await expect(page.getByRole('alert')).toContainText('Si el email está registrado');
 });
 
