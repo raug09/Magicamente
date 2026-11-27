@@ -18,10 +18,10 @@ El orden importa, porque cada pieza necesita la dirección de la anterior: **1) 
 
 ## 1. Base de datos (MongoDB Atlas)
 
-1. Crea una cuenta en MongoDB Atlas y un clúster **M0 (Free)**. Elige una región cercana al backend (p. ej. AWS Virginia si el backend va en Virginia).
+1. Crea una cuenta en MongoDB Atlas y un clúster **M0 (Free)**. Elige una región cercana al backend (p. ej. AWS Virginia si el backend va en Virginia). **Si ya tienes un clúster, reutilízalo** (el plan gratuito solo permite uno por proyecto) pero con una **base de datos nueva**: así no se tocan datos antiguos, porque el backend migra en el sitio cualquier dato viejo que encuentre al arrancar.
 2. **Database Access:** crea un usuario de base de datos con una contraseña larga y aleatoria. Usa solo letras y números (si lleva símbolos hay que codificarlos en la dirección de conexión).
 3. **Network Access:** el plan gratuito de Render no tiene IP fija, así que hay que permitir `0.0.0.0/0` (cualquier IP). Es el motivo por el que la contraseña del paso 2 debe ser fuerte.
-4. **Connect → Drivers:** copia la dirección de conexión (`mongodb+srv://…`). Añade el nombre de la base antes del `?`: `…mongodb.net/magicamente?…`. Esa dirección es tu `MONGO_URI`. **Es un secreto: no la pegues en el chat ni en el repositorio.**
+4. **Connect → Drivers:** copia la dirección de conexión (`mongodb+srv://…`). Añade el nombre de la base antes del `?`, y si reutilizas un clúster, **usa un nombre distinto al de la base antigua**: `…mongodb.net/magicamente_pruebas?…`. MongoDB la crea sola al guardar el primer dato. Esa dirección es tu `MONGO_URI`. **Es un secreto: no la pegues en el chat ni en el repositorio.**
 
 ## 2. Backend (Render)
 
