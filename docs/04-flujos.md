@@ -104,6 +104,17 @@ stateDiagram-v2
 - **Completar** (`PATCH /appointment/update/:id` con `{ "state": "completada" }`): solo el psicólogo de la cita (o un administrador), solo si está `pendiente` y su hora ya pasó.
 - Cancelar, completar y consultar solo las puede hacer el paciente o el psicólogo de la cita, o un administrador (si no, 403).
 
+## Borrar una cuenta
+
+`DELETE /api/users/:id` (uno mismo o administrador) **no borra el registro**: lo anonimiza, para que el historial de citas completadas siga teniendo sentido sin conservar datos personales.
+
+1. **Se bloquea la cuenta**: nombre → “Usuario eliminado”, email → `deleted-<id>@deleted.invalid` (el email original queda libre), contraseña inutilizable, `isActive: false`, `deletedAt`, se borran estudios y descripción y se invalidan las sesiones.
+2. **Citas pendientes** → `cancelada`. Si el eliminado era el paciente, la franja vuelve a estar libre. Se envía el correo `appointmentCancelled` a la otra persona (si falla, no se interrumpe el borrado).
+3. **Si era psicólogo**: se borran sus franjas sin ninguna cita; las que tienen citas (aunque sean históricas) se conservan como no reservables. Deja de aparecer en `/api/psychologists`, y no se pueden reservar sus franjas restantes (`409`).
+4. **Último administrador**: no se puede eliminar (`409`).
+
+Los pasos se ejecutan en orden y cada uno es independiente (sin transacción, MongoDB necesitaría un clúster con réplicas); si el servidor se cayera a mitad, la cuenta ya está bloqueada y las citas pendientes que quedaran se podrían cancelar a mano.
+
 ## 5. Recordatorios automáticos (`config/cronJobs.ts`)
 
 - Expresión `"0 * * * *"` → al minuto 0 de **cada hora**.
@@ -120,5 +131,6 @@ stateDiagram-v2
 | `confirmation` | `name` | Registro |
 | `resetPassword` | `name`, `resetLink` | Recuperación de contraseña |
 | `appointmentReminder` | `name`, `date`, `hour` | Cron |
+| `appointmentCancelled` | `name`, `date`, `hour` | Aviso a la otra persona al eliminar una cuenta con citas pendientes |
 
 Remitente: `EMAIL_FROM` (por defecto `Soporte <support@magicamente.online>`). Sin `RESEND_API_KEY` los correos no se envían: se muestra un aviso en consola. El dominio tiene que estar verificado en la cuenta de Resend asociada a `RESEND_API_KEY`.

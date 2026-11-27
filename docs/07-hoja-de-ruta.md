@@ -35,12 +35,14 @@ Las referencias (S1, F2…) apuntan a [06 · Problemas conocidos](06-problemas-c
 
 - Sesiones validadas contra la BD (borrado, desactivado, cambio de rol y de contraseña surten efecto al instante), política de contraseña común, límite de intentos por IP, `helmet` y CORS restringido (S10–S15).
 
+## ✅ Hecho: cuenta y sesión
+
+- `GET /api/auth/me`, registro que devuelve la sesión y borrado de cuentas sin datos huérfanos (F16).
+
 ## Siguiente · Completar el producto mínimo
 
-- [ ] `GET /api/auth/me` para que el frontend obtenga el usuario sin decodificar el JWT.
 - [ ] Decidir la estrategia de zonas horarias (F14) y franjas para hoy (F12).
 - [ ] Horarios recurrentes (`recurrent`) o eliminar el campo.
-- [ ] Borrado en cascada o borrado lógico con `isActive` (F16, S11).
 
 ## Calidad y despliegue
 

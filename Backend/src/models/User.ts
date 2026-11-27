@@ -15,6 +15,8 @@ export interface IUser extends Document {
   passwordResetExpires?: Date;
   /** Los tokens de sesión emitidos antes de esta fecha dejan de valer. */
   passwordChangedAt?: Date;
+  /** Fecha en que se eliminó la cuenta. Los datos personales se anonimizan, pero el registro se conserva. */
+  deletedAt?: Date;
 }
 
 const UserSchema = new Schema<IUser>({
@@ -30,6 +32,7 @@ const UserSchema = new Schema<IUser>({
   passwordResetTokenHash: { type: String, select: false },
   passwordResetExpires: { type: Date, select: false },
   passwordChangedAt: { type: Date, select: false },
+  deletedAt: { type: Date },
 });
 
 export default model<IUser>('User', UserSchema);

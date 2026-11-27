@@ -12,7 +12,6 @@ Prioridad: 🔴 crítico · 🟠 importante · 🟡 menor.
 |---|---|---|---|
 | F12 | 🟡 | Crear horario compara `day` (medianoche) con ahora: imposible crear franjas para hoy | `scheduleController.createSchedule` |
 | F14 | 🟡 | Las horas se interpretan en UTC; sin gestión de zona horaria por usuario | `appointmentService`, `Schedule.hour` |
-| F16 | 🟡 | Borrar un usuario deja horarios y citas huérfanos | `userService.deleteUserService` |
 
 ### Seguridad
 
@@ -65,6 +64,8 @@ No hay problemas de seguridad abiertos conocidos. Límites a tener en cuenta:
 | S14 | Contraseña mínima solo al restablecer | Política común (8 caracteres–72 bytes) en registro, `PUT` y `reset-password` |
 | S15 | `forgot-password` sin límite por IP | Límite compartido de 10 por hora y IP, además del de 1 por minuto y cuenta |
 | — | Aceptaba cualquier algoritmo de JWT | Solo HS256 |
+| F16 | Borrar un usuario dejaba horarios y citas huérfanos | `DELETE /users/:id` anonimiza la cuenta, cancela sus citas pendientes (avisando por correo), libera o borra franjas y protege al último administrador |
+| — | Un psicólogo desactivado seguía siendo reservable | La reserva exige un psicólogo activo (`409`) |
 | — | Sin tests ni CI | Vitest + Supertest + MongoDB en memoria; workflow de GitHub Actions |
 | F1 | “Mis citas” siempre devolvía 403 (roles en inglés) y respondía dos veces | Roles `paciente`/`psicologo`, `asyncHandler`; el populate ya no expone contraseñas ni emails ajenos; ordenado por fecha |
 | F4 | Cancelar guardaba `'cancelled'` (fuera del enum) | Guarda `'cancelada'` con validación; migración de los datos antiguos al arrancar |

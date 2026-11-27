@@ -11,6 +11,10 @@ import { assertValidPassword } from '../utils/password';
 /** Roles que se pueden elegir en el registro público. Los administradores se crean aparte. */
 export const SELF_REGISTER_ROLES: Role[] = ['paciente', 'psicologo'];
 
+/** JWT de sesión: caduca en 1 hora. El rol real se vuelve a leer de la BD en cada petición. */
+export const signToken = (user: Pick<IUser, '_id' | 'role'>): string =>
+  jwt.sign({ id: user._id, role: user.role }, getJwtSecret(), { expiresIn: '1h' });
+
 export const hashPassword = async (password: string): Promise<string> => {
   const salt = await bcrypt.genSalt(10);
   return bcrypt.hash(password, salt);
@@ -64,7 +68,7 @@ export const loginService = async (email: string, password: string): Promise<str
     throw new AppError(403, 'Cuenta desactivada');
   }
 
-  return jwt.sign({ id: user._id, role: user.role }, getJwtSecret(), { expiresIn: '1h' });
+  return signToken(user);
 };
 
 // --- Recuperación de contraseña -------------------------------------------------------------

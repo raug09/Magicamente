@@ -55,6 +55,7 @@ erDiagram
 | `schedules` | [ObjectId → Schedule] | | Se añade cada horario creado; nunca se limpia |
 | `passwordResetTokenHash` | String | oculto (`select: false`) | SHA-256 del token de recuperación; se borra al usarlo |
 | `passwordResetExpires` | Date | oculto (`select: false`) | Caducidad del token (1 h); `expires - 1 h` indica cuándo se pidió |
+| `deletedAt` | Date | | Fecha de eliminación de la cuenta (anonimizada); los listados y perfiles la ocultan |
 | `passwordChangedAt` | Date | oculto (`select: false`) | Se actualiza al cambiar o restablecer la contraseña; los tokens anteriores dejan de valer |
 | `createdAt` | Date | defecto ahora | |
 

@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
-import { registerService, loginService, forgotPasswordService, resetPasswordService } from '../services/authService';
+import { registerService, loginService, forgotPasswordService, resetPasswordService, signToken } from '../services/authService';
+import { getUserService } from '../services/userService';
 import { AppError } from '../utils/AppError';
 
 const isNonEmptyString = (value: unknown): value is string => typeof value === 'string' && value.trim() !== '';
@@ -14,8 +15,13 @@ export const register = async (req: Request, res: Response) => {
     throw new AppError(400, 'studies debe ser una lista de textos');
   }
 
-  await registerService({ name, email, password, role, studies });
-  res.status(201).json({ message: 'Usuario registrado correctamente' });
+  const user = await registerService({ name, email, password, role, studies });
+  // Se devuelve la sesión ya iniciada: el frontend no necesita un login extra.
+  res.status(201).json({
+    message: 'Usuario registrado correctamente',
+    token: signToken(user),
+    user: await getUserService(String(user._id)),
+  });
 };
 
 export const login = async (req: Request, res: Response) => {
@@ -47,4 +53,13 @@ export const resetPassword = async (req: Request, res: Response) => {
 
   await resetPasswordService(token, password);
   res.status(200).json({ message: 'Contraseña actualizada correctamente' });
+};
+
+/** El usuario autenticado: sirve para pintar la sesión sin decodificar el JWT. */
+export const me = async (req: Request, res: Response) => {
+  const user = await getUserService(req.user!.id);
+  if (!user) {
+    throw new AppError(404, 'Usuario no encontrado');
+  }
+  res.status(200).json(user);
 };

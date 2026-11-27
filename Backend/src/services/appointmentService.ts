@@ -1,5 +1,6 @@
 import Appointment, { IAppointment } from '../models/appointment';
 import Schedule from '../models/Schedule';
+import User from '../models/User';
 import { slotStart, updateAvailabilitySchedule } from './scheduleService';
 import { AuthUser } from '../middlewares/auth';
 import { AppError } from '../utils/AppError';
@@ -36,6 +37,10 @@ export const scheduleAppointment = async ({ patientId, scheduleId }: { patientId
   }
   if (!schedule.isAvailable) {
     throw new AppError(409, 'Este horario ya está ocupado.');
+  }
+  const psychologist = await User.findOne({ _id: schedule.psychologist, isActive: { $ne: false }, deletedAt: null });
+  if (!psychologist) {
+    throw new AppError(409, 'El psicólogo ya no está disponible.');
   }
 
   const appointmentTime = slotStart(schedule.day, schedule.hour);

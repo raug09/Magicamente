@@ -2,15 +2,11 @@ import cron from 'node-cron';
 import Appointment from '../models/appointment';
 import User from '../models/User';
 import { sendEmail } from '../services/emailService';
-import { getAppTimezone } from './env';
+import { formatAppointmentDate } from '../utils/dates';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-/** Formatea fecha y hora de la cita para el correo, en la zona horaria configurada. */
-export const formatAppointmentDate = (date: Date, timeZone = getAppTimezone()) => ({
-  date: date.toLocaleDateString('es-ES', { timeZone, weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }),
-  hour: date.toLocaleTimeString('es-ES', { timeZone, hour: '2-digit', minute: '2-digit' }),
-});
+export { formatAppointmentDate };
 
 /**
  * Envía un único recordatorio por cita pendiente que empiece en las próximas 24 horas.

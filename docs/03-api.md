@@ -13,12 +13,13 @@ Leyenda: ✅ funciona · ⚠️ funciona con salvedades · ❌ roto (detalles en
 | GET | `/` | todos | Comprobación de vida | ✅ |
 | POST | `/api/auth/register` | todos | Registro (paciente o psicólogo) | ✅ |
 | POST | `/api/auth/login` | todos | Login, devuelve JWT | ✅ |
+| GET | `/api/auth/me` | 🔒 | Usuario de la sesión actual | ✅ |
 | POST | `/api/auth/forgot-password` | todos | Pide un enlace para restablecer la contraseña | ✅ |
 | POST | `/api/auth/reset-password` | todos | Cambia la contraseña con el token del enlace | ✅ |
 | GET | `/api/users` | 🔒 admin | Listar usuarios | ✅ |
 | GET | `/api/users/:id` | 🔒 | Perfil propio, o perfil público de un psicólogo | ✅ |
 | PUT | `/api/users/:id` | 🔒 uno mismo o admin | Actualizar usuario | ✅ |
-| DELETE | `/api/users/:id` | 🔒 uno mismo o admin | Borrar usuario | ⚠️ no borra en cascada |
+| DELETE | `/api/users/:id` | 🔒 uno mismo o admin | Eliminar cuenta (anonimiza y limpia sus citas y franjas) | ✅ |
 | POST | `/api/schedule` | 🔒 psicólogo o admin | Crear franja horaria | ✅ |
 | GET | `/api/psychologists` | 🔒 | Listado de psicólogos (búsqueda y paginación) | ✅ |
 | GET | `/api/schedule/:psychologistId` | 🔒 | Franjas de un psicólogo (con filtros) | ✅ |
@@ -54,7 +55,7 @@ Los antiguos `POST /api/email/send-test` y `GET /api/notifications/test` se **el
 - `name`, `email`, `password` obligatorios → si faltan, `400`. `studies` debe ser una lista de textos.
 - Email ya usado → `409`.
 - Tras guardar intenta enviar el correo `confirmation`; si falla, solo lo registra en el log.
-- `201 { "message": "Usuario registrado correctamente" }`. No devuelve el `_id` ni un token.
+- `201 { "message": "Usuario registrado correctamente", "token": "…", "user": {…} }`: devuelve la sesión ya iniciada (mismo token que daría el login), así no hace falta un login extra.
 
 ### `POST /api/auth/login`
 
@@ -66,7 +67,11 @@ Los antiguos `POST /api/email/send-test` y `GET /api/notifications/test` se **el
 - `401 { "message": "Credenciales inválidas" }` · `400` si faltan campos.
 - `403 "Cuenta desactivada"` si la contraseña es correcta pero la cuenta está desactivada (con contraseña incorrecta siempre es `401`).
 - Límite: 10 intentos **fallidos** cada 15 minutos por IP; después `429`. Los inicios de sesión correctos no cuentan.
-- Para conocer tu `_id`, decodifica el payload del JWT.
+- Para conocer tu `_id` y tu rol usa `GET /api/auth/me`.
+
+### `GET /api/auth/me` 🔒
+
+Devuelve el usuario de la sesión (sin contraseña ni datos internos): `_id`, `name`, `email`, `role`, `isActive`, `studies`, `description`, `schedules`, `createdAt`. `401` si la sesión no es válida.
 
 ### `POST /api/auth/forgot-password`
 
@@ -115,7 +120,9 @@ Campos permitidos:
 - Devuelve el usuario actualizado (sin `password`), o `404`.
 
 ### `DELETE /api/users/:id` 🔒 uno mismo o admin
-`200 { "message": "Usuario eliminado correctamente" }` · `404` si no existe. No borra horarios ni citas asociados.
+`200 { "message": "Usuario eliminado correctamente" }` · `404` si no existe o ya estaba eliminado · `409` si es el último administrador.
+
+La cuenta se **anonimiza** (nombre “Usuario eliminado”, email y contraseña inutilizados, datos personales borrados) y se desactiva; el email queda libre. Se cancelan sus citas pendientes (y se avisa por correo a la otra persona), se libera la franja si era paciente, y si era psicólogo se borran sus franjas sin historial. Las citas completadas se conservan. Ver [flujos](04-flujos.md#borrar-una-cuenta).
 
 ## Psicólogos
 

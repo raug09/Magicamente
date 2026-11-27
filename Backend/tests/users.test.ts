@@ -124,7 +124,7 @@ describe('DELETE /api/users/:id', () => {
     const patient = await createUser('paciente');
     const res = await request(app).delete(`/api/users/${patient.id}`).set(auth(patient));
     expect(res.status).toBe(200);
-    expect(await User.findById(patient.id)).toBeNull();
+    expect((await User.findById(patient.id))?.deletedAt).toBeTruthy(); // anonimizada, no borrada del todo
   });
 
   it('un administrador puede borrar a cualquiera', async () => {

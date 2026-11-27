@@ -18,8 +18,8 @@ Documento pensado para quien construya el frontend (persona o sesión de Claude)
 1. `POST /api/auth/login` → `{ "token": "<jwt>" }`.
 2. Enviar `Authorization: Bearer <token>` en toda petición protegida.
 3. El token **dura 1 hora y no hay refresh token**: pasada la hora hay que volver a iniciar sesión.
-4. **No hay `GET /api/auth/me`.** El `id` y el `role` del usuario están dentro del JWT (payload `{ id, role, iat, exp }`): decodifica la parte central (base64url) para obtenerlos. No verifiques la firma en el cliente. *(Pendiente de backend: añadir `/auth/me`; ver §9.)*
-5. El registro (`POST /api/auth/register`) **no devuelve token**: tras registrarse hay que llamar a login.
+4. **`GET /api/auth/me`** devuelve el usuario de la sesión (`_id`, `name`, `email`, `role`, `studies`, `description`, `isActive`, `createdAt`). Llámalo al arrancar la app si hay un token guardado: si responde `401`, la sesión no vale; si responde `200`, ya tienes el usuario y su rol. **No decodifiques el JWT en el cliente.**
+5. El registro (`POST /api/auth/register`) **ya devuelve la sesión iniciada**: `{ message, token, user }`. No hace falta un login extra.
 
 ### Cuándo se invalida la sesión (siempre `401`)
 
@@ -73,7 +73,7 @@ El registro público solo permite `paciente` o `psicologo`. El primer administra
 
 ```http
 POST /api/auth/register   { "name", "email", "password", "role"?: "paciente"|"psicologo", "studies"?: ["…"] }
-→ 201 { "message": "Usuario registrado correctamente" }
+→ 201 { "message": "Usuario registrado correctamente", "token": "…", "user": { "_id", "name", "email", "role", … } }
 → 400 (campo ausente, rol no permitido, contraseña débil) · 409 (email ya usado)
 
 POST /api/auth/login      { "email", "password" }
@@ -168,7 +168,14 @@ PUT /api/users/:id   (solo tú mismo o un admin)
 
 Cambiar la contraseña desde el perfil **cierra la sesión actual** (vuelve a pedir login).
 
-`DELETE /api/users/:id` borra la cuenta (tú mismo o admin). Ojo: hoy no borra sus franjas y citas (ver §9).
+`DELETE /api/users/:id` elimina la cuenta (tú mismo o un admin). Qué ocurre, para que el frontend lo explique antes de confirmar:
+
+- La cuenta **se anonimiza y se desactiva** (la persona no puede volver a entrar con ese token ni con esa contraseña; el email queda libre para registrarse de nuevo). Es irreversible.
+- Sus **citas pendientes se cancelan** y se avisa por correo a la otra persona. Si era el paciente, la franja vuelve a estar libre.
+- Si era psicólogo, se borran sus franjas sin historial y desaparece del listado de psicólogos.
+- Las citas **completadas** se conservan en el historial de la otra persona. En ellas el nombre de la persona eliminada aparece como **“Usuario eliminado”**: el frontend debe tolerarlo.
+- No se puede eliminar al **último administrador**: responde `409` (“No puedes eliminar al último administrador”).
+- Tras eliminar la propia cuenta, el frontend debe borrar el token y volver a login (cualquier petición posterior da `401`).
 
 ## 6. Fechas y zonas horarias ⚠️
 
@@ -207,10 +214,7 @@ npm install && npm run dev             # http://localhost:3000
 
 ### Backend que facilitaría el frontend (por orden de utilidad)
 
-- [ ] **`GET /api/auth/me`**: devolver el usuario actual (id, nombre, rol) sin decodificar el JWT.
-- [ ] **`POST /api/auth/register` devolviendo el token** (o el usuario) para no obligar a un login extra.
 - [ ] **Decisión de zonas horarias** (campo `timezone` por usuario o convertir en el servidor) — §6.
-- [ ] Borrado de usuario sin dejar franjas y citas huérfanas.
 - [ ] Paginación en “mis citas”.
 - [ ] Documentación OpenAPI/Swagger generada (así el frontend puede generar sus tipos automáticamente).
 
