@@ -4,11 +4,13 @@ on:
   push:
     paths:
       - 'Frontend/**'
+      - 'Backend/**'
       - 'docs/openapi.json'
       - '.github/workflows/frontend.yml'
   pull_request:
     paths:
       - 'Frontend/**'
+      - 'Backend/**'
       - 'docs/openapi.json'
       - '.github/workflows/frontend.yml'
   workflow_dispatch:
@@ -37,3 +39,53 @@ jobs:
         run: |
           npm run api:types
           git diff --exit-code -- src/api/schema.d.ts || (echo "Regenera los tipos: npm run api:types" && exit 1)
+
+  # Pruebas de extremo a extremo: backend real + MongoDB real + navegador de verdad.
+  e2e:
+    runs-on: ubuntu-latest
+    services:
+      mongo:
+        image: mongo:7
+        ports:
+          - 27017:27017
+    env:
+      MONGO_URI: mongodb://localhost:27017/magicamente_e2e
+      JWT_SECRET: e2e-secret-solo-para-ci-0123456789
+      PORT: '3000'
+      FRONTEND_URL: http://localhost:5173
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            Backend/package-lock.json
+            Frontend/package-lock.json
+      - name: Backend (compilar, sembrar datos y arrancar)
+        working-directory: Backend
+        run: |
+          npm ci
+          npm run build
+          npx ts-node --transpile-only scripts/e2e-seed.ts
+          node dist/index.js > backend.log 2>&1 &
+          for i in $(seq 1 30); do curl -sf http://localhost:3000/health && break; sleep 1; done
+      - name: Frontend (dependencias y navegador)
+        working-directory: Frontend
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+      - name: Pruebas de extremo a extremo
+        working-directory: Frontend
+        run: npm run e2e
+      - name: Registro del backend (si algo falla)
+        if: failure()
+        working-directory: Backend
+        run: tail -n 200 backend.log || true
+      - name: Informe de Playwright
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: Frontend/playwright-report
+          if-no-files-found: ignore

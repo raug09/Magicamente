@@ -12,7 +12,8 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "api:types": "openapi-typescript ../docs/openapi.json -o src/api/schema.d.ts"
+    "api:types": "openapi-typescript ../docs/openapi.json -o src/api/schema.d.ts",
+    "e2e": "playwright test"
   },
   "dependencies": {
     "@mantine/core": "9.8.0",
@@ -26,6 +27,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",
+    "@playwright/test": "^1.65.0",
     "@testing-library/jest-dom": "7.0.1",
     "@testing-library/react": "16.3.3",
     "@testing-library/user-event": "14.6.10",
