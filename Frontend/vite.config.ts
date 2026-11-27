@@ -9,4 +9,8 @@ export default defineConfig({
   server: {
     proxy: { '/api': backend },
   },
+  // `npm run preview` (usado por las pruebas de extremo a extremo) también reenvía /api.
+  preview: {
+    proxy: { '/api': backend },
+  },
 });
