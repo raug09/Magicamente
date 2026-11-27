@@ -126,13 +126,13 @@ describe('GET /api/schedule/:psychologistId (filtros)', () => {
   it('from y to acotan por día, ambos incluidos', async () => {
     const { psychologist, patient } = await seed();
     const range = await get(patient, psychologist.id, `?available=true&from=${futureDay(10)}&to=${futureDay(11)}`);
-    expect(range.body).toHaveLength(2);
+    expect(range.body.items).toHaveLength(2);
 
     const onlyFrom = await get(patient, psychologist.id, `?available=true&from=${futureDay(12)}`);
-    expect(onlyFrom.body).toHaveLength(1);
+    expect(onlyFrom.body.items).toHaveLength(1);
 
     const onlyTo = await get(patient, psychologist.id, `?to=2020-12-31`);
-    expect(onlyTo.body).toHaveLength(1); // solo la de 2020
+    expect(onlyTo.body.items).toHaveLength(1); // solo la de 2020
   });
 
   it('valida los parámetros', async () => {
@@ -145,7 +145,7 @@ describe('GET /api/schedule/:psychologistId (filtros)', () => {
 
   it('un psicólogo inexistente devuelve una lista vacía y un id mal formado, 400', async () => {
     const patient = await createUser('paciente');
-    expect((await get(patient, '000000000000000000000000')).body).toEqual([]);
+    expect((await get(patient, '000000000000000000000000')).body.items).toEqual([]);
     expect((await get(patient, 'no-es-un-id')).status).toBe(400);
   });
 });
