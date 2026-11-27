@@ -2,29 +2,31 @@
 
 Base: `http://localhost:3000` · Formato: JSON · Autenticación: cabecera `Authorization: Bearer <token>` donde se indica 🔒.
 
-Leyenda de estado: ✅ funciona · ⚠️ funciona con salvedades · ❌ roto. Los detalles están en [06 · Problemas conocidos](06-problemas-conocidos.md).
+Los errores responden `{ "message": "..." }` con un código HTTP adecuado (400 datos no válidos o id mal formado, 401 sin sesión, 403 sin permiso, 404 no existe, 409 duplicado). Ver [01 · Arquitectura](01-arquitectura.md#manejo-de-errores).
+
+Leyenda: ✅ funciona · ⚠️ funciona con salvedades · ❌ roto (detalles en [06 · Problemas conocidos](06-problemas-conocidos.md)).
 
 ## Resumen
 
-| Método | Ruta | Auth | Descripción | Estado |
+| Método | Ruta | Quién | Descripción | Estado |
 |---|---|---|---|---|
-| GET | `/` | — | Comprobación de vida | ✅ |
-| POST | `/api/auth/register` | — | Registro de usuario | ⚠️ |
-| POST | `/api/auth/login` | — | Login, devuelve JWT | ✅ |
+| GET | `/` | todos | Comprobación de vida | ✅ |
+| POST | `/api/auth/register` | todos | Registro (paciente o psicólogo) | ✅ |
+| POST | `/api/auth/login` | todos | Login, devuelve JWT | ✅ |
 | GET | `/api/users` | 🔒 admin | Listar usuarios | ✅ |
-| GET | `/api/users/:id` | 🔒 | Obtener usuario | ⚠️ |
-| PUT | `/api/users/:id` | 🔒 | Actualizar usuario | ⚠️ |
-| DELETE | `/api/users/:id` | 🔒 | Borrar usuario | ⚠️ |
-| POST | `/api/schedule` | 🔒 | Crear franja horaria | ⚠️ |
+| GET | `/api/users/:id` | 🔒 | Perfil propio, o perfil público de un psicólogo | ✅ |
+| PUT | `/api/users/:id` | 🔒 uno mismo o admin | Actualizar usuario | ✅ |
+| DELETE | `/api/users/:id` | 🔒 uno mismo o admin | Borrar usuario | ⚠️ no borra en cascada |
+| POST | `/api/schedule` | 🔒 psicólogo o admin | Crear franja horaria | ✅ |
 | GET | `/api/schedule/:psychologistId` | 🔒 | Franjas de un psicólogo | ✅ |
-| GET | `/api/appointments/appointment` | 🔒 | Mis citas | ❌ |
-| POST | `/api/appointments/appointment` | 🔒 | Reservar cita | ⚠️ |
-| PATCH | `/api/appointments/appointment/cancel/:id` | 🔒 | Cancelar cita | ⚠️ |
-| PATCH | `/api/appointments/appointment/update/:id` | 🔒 | Modificar cita | ⚠️ |
-| POST | `/api/email/send-test` | — | Correo de prueba | ⚠️ abierto |
-| GET | `/api/notifications/test` | 🔒 | Correo de prueba fijo | ⚠️ |
+| GET | `/api/appointments/appointment` | 🔒 | Mis citas | ❌ siempre 403 |
+| POST | `/api/appointments/appointment` | 🔒 paciente | Reservar cita | ⚠️ errores con 201 |
+| PATCH | `/api/appointments/appointment/cancel/:id` | 🔒 participante o admin | Cancelar cita | ⚠️ |
+| PATCH | `/api/appointments/appointment/update/:id` | 🔒 participante o admin | Cambiar estado | ⚠️ |
 
-> La ruta de citas repite el nombre: `/api/appointments/appointment`.
+“Participante” = el paciente o el psicólogo de esa cita. La ruta de citas repite el nombre: `/api/appointments/appointment`.
+
+Los antiguos `POST /api/email/send-test` y `GET /api/notifications/test` se **eliminaron** (eran un relé de correo abierto y tenían una dirección personal fija).
 
 ---
 
@@ -42,10 +44,11 @@ Leyenda de estado: ✅ funciona · ⚠️ funciona con salvedades · ❌ roto. L
 }
 ```
 
-- `role` es opcional (por defecto `paciente`). **Cualquiera puede registrarse como `administrador`.**
-- Tras guardar, intenta enviar el correo `confirmation`; si falla, solo lo registra en el log.
+- `role` opcional: `paciente` (por defecto) o `psicologo`. Cualquier otro valor, incluido `administrador` → `400`.
+- `name`, `email`, `password` obligatorios → si faltan, `400`. `studies` debe ser una lista de textos.
+- Email ya usado → `409`.
+- Tras guardar intenta enviar el correo `confirmation`; si falla, solo lo registra en el log.
 - `201 { "message": "Usuario registrado correctamente" }`. No devuelve el `_id` ni un token.
-- `500 { "message": "El email ya está en uso" }` si el email existe (debería ser 409). Cualquier error de validación también da 500.
 
 ### `POST /api/auth/login`
 
@@ -54,8 +57,8 @@ Leyenda de estado: ✅ funciona · ⚠️ funciona con salvedades · ❌ roto. L
 ```
 
 - `200 { "token": "eyJ..." }` · payload `{ id, role, iat, exp }`, caduca en 1 h.
-- `500 { "message": "Credenciales inválidas" }` (debería ser 401).
-- Para conocer tu `_id`, decodifica el payload del JWT (la parte central, en base64).
+- `401 { "message": "Credenciales inválidas" }` · `400` si faltan campos.
+- Para conocer tu `_id`, decodifica el payload del JWT.
 
 ## Usuarios
 
@@ -63,66 +66,70 @@ Leyenda de estado: ✅ funciona · ⚠️ funciona con salvedades · ❌ roto. L
 Lista todos los usuarios sin `password`. `403` si no eres administrador.
 
 ### `GET /api/users/:id` 🔒
-Cualquier usuario autenticado puede leer a cualquier otro (sin `password`).
-`404` si no existe (y después el servidor registra un error *headers already sent*). Un id mal formado devuelve `500` (CastError).
+- Tu propio id, o cualquier id si eres admin → perfil completo sin `password`.
+- Id de un psicólogo → perfil público: `name`, `role`, `studies`, `description` (sin email).
+- Cualquier otro caso → `404`.
 
-### `PUT /api/users/:id` 🔒
-Body: cualquier subconjunto de campos (`name`, `description`, `studies`…). Devuelve el usuario actualizado.
-**Sin control de propiedad ni de campos**: cualquier usuario puede cambiar el `role` o el `password` (sin hashear) de cualquiera.
+### `PUT /api/users/:id` 🔒 uno mismo o admin
+Campos permitidos:
 
-### `DELETE /api/users/:id` 🔒
-`200 { "message": "Usuario eliminado correctamente" }`. Mismo problema de autorización; no borra horarios ni citas asociados.
+| Quién | Campos |
+|---|---|
+| Uno mismo | `name`, `description`, `studies`, `password` |
+| Administrador | los anteriores + `email`, `role`, `isActive` |
+
+- Un campo no permitido → `403` indicando cuál. Editar a otro usuario sin ser admin → `403`.
+- `password` se guarda hasheada.
+- Devuelve el usuario actualizado (sin `password`), o `404`.
+
+### `DELETE /api/users/:id` 🔒 uno mismo o admin
+`200 { "message": "Usuario eliminado correctamente" }` · `404` si no existe. No borra horarios ni citas asociados.
 
 ## Horarios
 
-### `POST /api/schedule` 🔒
+### `POST /api/schedule` 🔒 psicólogo o admin
 
+Como psicólogo (la franja es siempre tuya):
 ```json
-{ "psychologist": "<idPsicologo>", "day": "2026-12-15", "hour": "10:00" }
+{ "day": "2026-12-15", "hour": "10:00" }
 ```
+Como administrador hay que añadir `"psychologist": "<idPsicologo>"`.
 
-- `400 "No puedes crear horarios en fechas pasadas"` si `day` < ahora (por eso tampoco se puede crear para *hoy*).
-- `400 "Psicólogo no encontrado"` / `400 "Ya existe un horario con la misma fecha y hora para este psicólogo."`
-- `201 { "message": "Horario creado exitosamente", "schedule": {...} }`
-- No comprueba que quien llama sea ese psicólogo, ni siquiera que sea psicólogo.
+- Psicólogo que indica otro `psychologist` → `403`. Paciente → `403`.
+- `day` fecha válida y futura (no vale hoy), `hour` en formato `HH:mm` → si no, `400`.
+- El destinatario no es psicólogo → `404`. Franja repetida → `409`.
+- `201 { "message": "Horario creado exitosamente", "schedule": {...} }`.
 
 ### `GET /api/schedule/:psychologistId` 🔒
 Array con **todas** las franjas del psicólogo (pasadas y ocupadas incluidas). Filtra por `isAvailable` en el cliente.
 
 ## Citas
 
-### `POST /api/appointments/appointment` 🔒
+### `POST /api/appointments/appointment` 🔒 paciente
 
 ```json
-{
-  "patientId": "<idPaciente>",
-  "psychologistId": "<idPsicologo>",
-  "scheduleId": "<idHorario>"
-}
+{ "scheduleId": "<idHorario>" }
 ```
 
-- Calcula `time` = `schedule.day` + `schedule.hour` (UTC), rechaza fechas pasadas y duplicados del mismo paciente a la misma hora, crea la cita en `pendiente` y marca el horario `isAvailable=false`.
+- El paciente es siempre el usuario autenticado y el psicólogo, el dueño del horario. Si el body trae `patientId` o `psychologistId`, se ignoran.
+- Calcula `time` = `schedule.day` + `schedule.hour` (UTC), crea la cita `pendiente` y marca el horario `isAvailable=false`.
 - `201 { "message": "Appointment scheduled successfully", "appointment": {...} }`.
 - ⚠️ Los errores de negocio **también responden 201**, con `appointment: { "error": "..." }`: `"El horario no existe."`, `"Este horario ya está ocupado."`, `"No puedes agendar citas en fechas pasadas."`, `"Ya tienes una cita programada en este horario."`. El cliente debe mirar `appointment.error`.
-- `500` si el `scheduleId` ya se usó antes en otra cita (índice único), aunque esa cita se cancelara.
+- `409` si esa franja ya se usó antes en otra cita, aunque esa cita se cancelara (índice único).
 
 ### `GET /api/appointments/appointment` 🔒 ❌
-Debería devolver las citas del paciente o del psicólogo autenticado (con `populate`). **Siempre responde `403 "Acceso no permitido"`** porque compara el rol con `'patient'`/`'psychologist'` en vez de `'paciente'`/`'psicologo'`.
+Debería devolver tus citas. **Siempre responde `403`** porque compara el rol con `'patient'`/`'psychologist'` en vez de `'paciente'`/`'psicologo'`.
 
-### `PATCH /api/appointments/appointment/cancel/:id` 🔒
-Sin body. Pone el estado a `'cancelled'` (valor fuera del enum) y libera el horario (`isAvailable=true`).
-`200 { "message": "Appointment canceled successfully", "appointment": {...} }` · `404` si no existe.
+### `PATCH /api/appointments/appointment/cancel/:id` 🔒 participante o admin
+Sin body. Pone el estado a `'cancelled'` (valor fuera del enum, pendiente de corregir) y libera el horario.
+`200 { "message": "Appointment canceled successfully", "appointment": {...} }` · `403` si no es tu cita · `404` si no existe.
 
-### `PATCH /api/appointments/appointment/update/:id` 🔒
-Body: campos a sobrescribir (p. ej. `{ "state": "completada" }`).
-- `400 "Solo puedes modificar la cita hasta 24 horas antes de la fecha programada."` si faltan < 24 h (eso impide marcarla como `completada` después de la sesión).
+### `PATCH /api/appointments/appointment/update/:id` 🔒 participante o admin
+
+```json
+{ "state": "completada" }
+```
+
+- Solo se admite `state` (`pendiente`, `completada`, `cancelada`). Otro campo → `403`; otro valor → `400`.
+- Solo si faltan más de 24 h para la cita → si no, `400`. Por eso todavía no se puede marcar como `completada` después de la sesión.
 - `200 { "message": "Cita actualizada correctamente", "updatedAppointment": {...} }`.
-- Copia el body tal cual (`Object.assign`): se puede cambiar paciente, psicólogo o `time` sin tocar los horarios.
-
-## Correo (pruebas)
-
-### `POST /api/email/send-test`
-Body `{ "email": "...", "nombre": "..." }`. Envía la plantilla `confirmation`. **Sin autenticación**: cualquiera puede usar el dominio para enviar correos.
-
-### `GET /api/notifications/test` 🔒
-Envía un correo fijo a una dirección personal escrita en el código. Solo útil para depurar; conviene eliminarlo.

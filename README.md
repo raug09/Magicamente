@@ -4,7 +4,7 @@
 
 API REST para una plataforma de **citas con psicólogos**: los psicólogos publican franjas horarias, los pacientes reservan citas y el sistema envía correos (confirmación de registro y recordatorio el día antes de la cita).
 
-> **Estado:** prototipo funcional en desarrollo (2 commits). El backend compila, pero tiene varios fallos y agujeros de seguridad que hay que corregir antes de usarlo en producción. Véase [Problemas conocidos](docs/06-problemas-conocidos.md).
+> **Estado:** prototipo en desarrollo. Ya están corregidos los agujeros de seguridad críticos, los permisos y el recordatorio de citas, y hay tests de integración con CI. Quedan fallos funcionales en el flujo de citas (p. ej. “mis citas” devuelve 403). Véase [Problemas conocidos](docs/06-problemas-conocidos.md).
 > El repositorio **no incluye frontend**.
 
 ## Stack
@@ -17,22 +17,17 @@ API REST para una plataforma de **citas con psicólogos**: los psicólogos publi
 | Autenticación | JWT (`jsonwebtoken`) + contraseñas con `bcryptjs` |
 | Correo | [Resend](https://resend.com) |
 | Tareas programadas | `node-cron` |
+| Tests | Vitest + Supertest + `mongodb-memory-server` |
 
 ## Arranque rápido
 
 ```bash
-# 1. Dependencias: hacen falta en la RAÍZ y en Backend/ (ver nota)
+cd Backend
 npm install
-cd Backend && npm install
-
-# 2. Variables de entorno
-cp .env.example .env    # y edita los valores
-
-# 3. Desarrollo (recarga automática)
+cp .env.example .env    # rellena al menos JWT_SECRET y MONGO_URI
 npm run dev             # http://localhost:3000
+npm test                # tests de integración (descarga MongoDB la primera vez)
 ```
-
-> **Nota:** `jsonwebtoken` y `bcryptjs` están declarados en el `package.json` de la raíz, no en el de `Backend/`. El backend los encuentra porque Node sube a buscar `../node_modules`. Si solo instalas en `Backend/`, el servidor falla al arrancar.
 
 ## Documentación
 

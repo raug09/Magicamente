@@ -37,6 +37,7 @@ erDiagram
     string state "pendiente | completada | cancelada"
     Date time "día + hora en UTC"
     string hour
+    bool reminderSent
   }
 ```
 
@@ -46,8 +47,8 @@ erDiagram
 |---|---|---|---|
 | `name` | String | obligatorio | |
 | `email` | String | obligatorio, **único** | Sin normalizar (mayúsculas/espacios cuentan como distintos) |
-| `password` | String | obligatorio | Hash bcrypt (10 rondas) al registrarse. **No** se vuelve a hashear si se cambia por `PUT /api/users/:id` |
-| `role` | enum | `paciente` (defecto), `psicologo`, `administrador` | Lo elige el cliente al registrarse |
+| `password` | String | obligatorio | Hash bcrypt (10 rondas), también al cambiarla por `PUT /api/users/:id` |
+| `role` | enum | `paciente` (defecto), `psicologo`, `administrador` | En el registro solo `paciente` o `psicologo`; el resto lo cambia un administrador |
 | `isActive` | Boolean | defecto `true` | No se usa en ningún sitio (no bloquea el login) |
 | `studies` | [String] | defecto `[]` | Formación del psicólogo |
 | `description` | String | | No se puede rellenar al registrarse, solo con `PUT` |
@@ -60,7 +61,7 @@ Una **franja horaria concreta** de un psicólogo (no un horario semanal).
 
 | Campo | Tipo | Reglas | Notas |
 |---|---|---|---|
-| `psychologist` | ObjectId → User | obligatorio | No se comprueba que el usuario tenga rol `psicologo` |
+| `psychologist` | ObjectId → User | obligatorio | Debe ser un usuario con rol `psicologo`; si lo crea un psicólogo, es siempre él mismo |
 | `day` | Date | obligatorio | Fecha; se espera medianoche UTC, p. ej. `"2026-12-15"` |
 | `hour` | String | obligatorio | Formato `"HH:mm"`, se interpreta **en UTC** al reservar |
 | `isAvailable` | Boolean | defecto `true` | `false` cuando hay una cita reservada |
@@ -73,12 +74,13 @@ Unicidad (`psychologist` + `day` + `hour`) solo se comprueba en código, no con 
 
 | Campo | Tipo | Reglas | Notas |
 |---|---|---|---|
-| `patientId` | ObjectId → User | obligatorio | Se toma del **body**, no del token |
-| `psychologistId` | ObjectId → User | obligatorio | Se toma del body; no se comprueba que coincida con el dueño del horario |
+| `patientId` | ObjectId → User | obligatorio | El usuario autenticado que reserva |
+| `psychologistId` | ObjectId → User | obligatorio | El dueño del horario reservado |
 | `scheduleId` | ObjectId → Schedule | obligatorio, **índice único** | Impide volver a reservar una franja cancelada (ver problemas) |
 | `state` | enum | `pendiente` (defecto), `completada`, `cancelada` | La cancelación escribe `'cancelled'`, fuera del enum |
 | `time` | Date | obligatorio | `schedule.day` con `setUTCHours(hora, minutos)` |
 | `hour` | String | obligatorio | Copia de `schedule.hour` |
+| `reminderSent` | Boolean | defecto `false` | `true` cuando ya se envió el recordatorio (las citas antiguas sin el campo cuentan como no enviadas) |
 
 No hay `timestamps` en ningún modelo, ni borrado en cascada (borrar un usuario deja horarios y citas huérfanos).
 
