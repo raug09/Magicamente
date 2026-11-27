@@ -53,6 +53,8 @@ erDiagram
 | `studies` | [String] | defecto `[]` | Formación del psicólogo |
 | `description` | String | | No se puede rellenar al registrarse, solo con `PUT` |
 | `schedules` | [ObjectId → Schedule] | | Se añade cada horario creado; nunca se limpia |
+| `passwordResetTokenHash` | String | oculto (`select: false`) | SHA-256 del token de recuperación; se borra al usarlo |
+| `passwordResetExpires` | Date | oculto (`select: false`) | Caducidad del token (1 h); `expires - 1 h` indica cuándo se pidió |
 | `createdAt` | Date | defecto ahora | |
 
 ## `Schedule` (`models/Schedule.ts`)

@@ -20,6 +20,9 @@ Prioridad: 🔴 crítico · 🟠 importante · 🟡 menor.
 |---|---|---|---|
 | S10 | 🟡 | Sin rate limiting en login, CORS abierto a `*`, sin `helmet` | `express-rate-limit`, `cors({ origin })`, `helmet` |
 | S11 | 🟡 | `isActive` no se comprueba en login ni en el middleware | Rechazar usuarios inactivos |
+| S13 | 🟠 | Tras restablecer la contraseña, los JWT ya emitidos siguen valiendo hasta 1 h (el servidor no guarda sesiones) | Guardar `passwordChangedAt` y rechazar tokens emitidos antes; conviene hacerlo junto con S12 |
+| S14 | 🟡 | Contraseña mínima de 8 caracteres solo al restablecer: el registro y `PUT /users/:id` aceptan cualquiera | Una misma política en los tres sitios |
+| S15 | 🟡 | `forgot-password` limita por cuenta (1/min) pero no por IP | `express-rate-limit` |
 | S12 | 🟡 | Un token sigue valiendo hasta 1 h después de cambiar el rol o borrar al usuario (el rol va dentro del JWT) | Comprobar el usuario en BD en `isAuthenticated`, o tokens más cortos |
 
 ### Deuda técnica
@@ -55,6 +58,8 @@ Prioridad: 🔴 crítico · 🟠 importante · 🟡 menor.
 | — | Resend fallaba al arrancar sin API key | Cliente perezoso; sin key se avisa en consola |
 | F8 | Los pacientes no podían descubrir psicólogos | `GET /api/psychologists` con búsqueda por nombre, paginación y solo campos públicos |
 | — | `GET /schedule/:id` devolvía todas las franjas sin orden ni filtros, y no se podían editar ni borrar | Filtros `available`, `from`, `to`, orden por fecha, y `PUT`/`DELETE` de franjas libres (propias o admin) |
+| — | Sin recuperación de contraseña | `POST /auth/forgot-password` y `/auth/reset-password`: token aleatorio hasheado, 1 h, un solo uso, sin revelar qué emails existen |
+| — | Plantillas de correo sin escapar el nombre en HTML | `escapeHtml` en todas las plantillas |
 | — | Sin tests ni CI | Vitest + Supertest + MongoDB en memoria; workflow de GitHub Actions |
 | F1 | “Mis citas” siempre devolvía 403 (roles en inglés) y respondía dos veces | Roles `paciente`/`psicologo`, `asyncHandler`; el populate ya no expone contraseñas ni emails ajenos; ordenado por fecha |
 | F4 | Cancelar guardaba `'cancelled'` (fuera del enum) | Guarda `'cancelada'` con validación; migración de los datos antiguos al arrancar |

@@ -27,10 +27,13 @@ Las referencias (S1, F2…) apuntan a [06 · Problemas conocidos](06-problemas-c
 
 - `GET /api/schedule/:id` con `available`, `from`, `to` y orden por fecha; `PUT`/`DELETE` de franjas libres.
 
+## ✅ Hecho: recuperación de contraseña
+
+- `forgot-password` / `reset-password` con token hasheado de 1 h y un solo uso (ver [04](04-flujos.md)).
+
 ## Siguiente · Completar el producto mínimo
 
 - [ ] `GET /api/auth/me` para que el frontend obtenga el usuario sin decodificar el JWT.
-- [ ] Recuperación de contraseña (la plantilla `resetPassword` ya existe).
 - [ ] Decidir la estrategia de zonas horarias (F14) y franjas para hoy (F12).
 - [ ] Horarios recurrentes (`recurrent`) o eliminar el campo.
 - [ ] Borrado en cascada o borrado lógico con `isActive` (F16, S11).
@@ -38,7 +41,8 @@ Las referencias (S1, F2…) apuntan a [06 · Problemas conocidos](06-problemas-c
 ## Calidad y despliegue
 
 - [ ] Validación de entrada con `zod`.
-- [ ] `helmet`, `express-rate-limit` en login/registro, CORS restringido al dominio del frontend (S10).
+- [ ] `helmet`, `express-rate-limit` en login, registro y `forgot-password`, CORS restringido al dominio del frontend (S10, S15).
+- [ ] Invalidar los JWT al cambiar la contraseña o desactivar al usuario (S12, S13) y una política de contraseña común (S14).
 - [ ] ESLint + Prettier; logger (`pino`) en lugar de `console.log`.
 - [ ] Dockerfile + `docker-compose.yml` (API + Mongo).
 - [ ] Documentación OpenAPI/Swagger.

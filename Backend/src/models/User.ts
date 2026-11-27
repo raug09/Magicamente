@@ -10,6 +10,9 @@ export interface IUser extends Document {
   description?: string;
   createdAt: Date;
   schedules?: Types.ObjectId[];   
+  /** SHA-256 del token de recuperación enviado por correo (nunca el token en claro). */
+  passwordResetTokenHash?: string;
+  passwordResetExpires?: Date;
 }
 
 const UserSchema = new Schema<IUser>({
@@ -21,7 +24,9 @@ const UserSchema = new Schema<IUser>({
   studies: { type: [String], default: [] },  
   description: { type: String },
   createdAt: { type: Date, default: Date.now },
-  schedules: [{ type: Schema.Types.ObjectId, ref: 'Schedule' }]
+  schedules: [{ type: Schema.Types.ObjectId, ref: 'Schedule' }],
+  passwordResetTokenHash: { type: String, select: false },
+  passwordResetExpires: { type: Date, select: false },
 });
 
 export default model<IUser>('User', UserSchema);

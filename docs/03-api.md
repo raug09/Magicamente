@@ -13,6 +13,8 @@ Leyenda: ✅ funciona · ⚠️ funciona con salvedades · ❌ roto (detalles en
 | GET | `/` | todos | Comprobación de vida | ✅ |
 | POST | `/api/auth/register` | todos | Registro (paciente o psicólogo) | ✅ |
 | POST | `/api/auth/login` | todos | Login, devuelve JWT | ✅ |
+| POST | `/api/auth/forgot-password` | todos | Pide un enlace para restablecer la contraseña | ✅ |
+| POST | `/api/auth/reset-password` | todos | Cambia la contraseña con el token del enlace | ✅ |
 | GET | `/api/users` | 🔒 admin | Listar usuarios | ✅ |
 | GET | `/api/users/:id` | 🔒 | Perfil propio, o perfil público de un psicólogo | ✅ |
 | PUT | `/api/users/:id` | 🔒 uno mismo o admin | Actualizar usuario | ✅ |
@@ -62,6 +64,29 @@ Los antiguos `POST /api/email/send-test` y `GET /api/notifications/test` se **el
 - `200 { "token": "eyJ..." }` · payload `{ id, role, iat, exp }`, caduca en 1 h.
 - `401 { "message": "Credenciales inválidas" }` · `400` si faltan campos.
 - Para conocer tu `_id`, decodifica el payload del JWT.
+
+### `POST /api/auth/forgot-password`
+
+```json
+{ "email": "ana@example.com" }
+```
+
+- Responde **siempre** `200 { "message": "Si el email está registrado, recibirás un enlace para restablecer tu contraseña" }`, exista o no la cuenta (así no se puede averiguar qué emails están registrados).
+- Si la cuenta existe y está activa, se envía un correo con el enlace `<FRONTEND_URL>/reset-password?token=<token>`. El enlace **caduca en 1 hora** y **solo se puede usar una vez**.
+- Como mucho **un correo por minuto y cuenta**: si se vuelve a pedir antes, no se envía otro. Pasado ese minuto, el token nuevo invalida el anterior.
+- `400` si falta `email` o no es un texto.
+
+### `POST /api/auth/reset-password`
+
+```json
+{ "token": "<token del enlace>", "password": "nueva-clave-123" }
+```
+
+- `200 { "message": "Contraseña actualizada correctamente" }`. Después, la contraseña antigua deja de funcionar y el token queda consumido.
+- `400` si falta algún campo, si la contraseña tiene menos de **8 caracteres** (el token no se gasta), o si el token no es válido, ya se usó o caducó (`"El enlace no es válido o ha caducado"`).
+- No permite restablecer cuentas desactivadas.
+- El token se guarda hasheado (SHA-256) en la base de datos; nunca en claro.
+- ⚠️ Los JWT ya emitidos siguen valiendo hasta que caduquen (máx. 1 h). Ver [problemas conocidos](06-problemas-conocidos.md).
 
 ## Usuarios
 

@@ -36,3 +36,7 @@ export const getResendApiKey = (): string | undefined => process.env.RESEND_API_
 
 export const getEmailFrom = (): string =>
   process.env.EMAIL_FROM || 'Soporte <support@magicamente.online>';
+
+/** URL base del frontend, usada para construir el enlace de recuperación de contraseña. */
+export const getFrontendUrl = (): string =>
+  (process.env.FRONTEND_URL || 'http://localhost:5173').replace(/\/+$/, '');

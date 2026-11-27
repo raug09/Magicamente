@@ -25,6 +25,7 @@ Edita `Backend/.env`:
 | `RESEND_API_KEY` | para enviar correos | — | Envío de correo |
 | `EMAIL_FROM` | no | `Soporte <support@magicamente.online>` | Remitente |
 | `APP_TIMEZONE` | no | `UTC` | Zona horaria de las fechas en los correos |
+| `FRONTEND_URL` | para recuperar contraseña | `http://localhost:5173` | URL base del frontend; el correo enlaza a `<FRONTEND_URL>/reset-password?token=...` |
 
 ## Ejecución
 
@@ -102,9 +103,23 @@ db.users.updateOne({ email: "admin@example.com" }, { $set: { role: "administrado
 
 Vuelve a hacer login para obtener un token con el rol nuevo. A partir de ahí, ese administrador puede cambiar roles con `PUT /api/users/:id`.
 
+## Recuperar una contraseña
+
+```bash
+# 1. Pedir el enlace (la respuesta es la misma exista o no el email)
+curl -s -X POST $API/api/auth/forgot-password -H 'Content-Type: application/json' -d '{"email":"luis@example.com"}'
+
+# 2. Llega un correo con ...?token=<TOKEN>. Con ese token (válido 1 hora, un solo uso):
+curl -s -X POST $API/api/auth/reset-password -H 'Content-Type: application/json' \
+  -d '{"token":"<TOKEN>","password":"nueva-clave-123"}'
+```
+
+Sin `RESEND_API_KEY` el correo no se envía; en desarrollo puedes sacar el enlace del log del servidor: el aviso de consola solo indica que no se envió, así que lo más práctico es configurar una clave de Resend de pruebas. La contraseña nueva debe tener al menos 8 caracteres.
+
 ## Correos
 
 - **Confirmación** al registrarse.
+- **Recuperación de contraseña**: enlace de un solo uso, válido 1 hora.
 - **Recordatorio**: una vez por cita, unas 24 h antes. El cron se ejecuta al minuto 0 de cada hora.
 
 Sin `RESEND_API_KEY` verás en consola `[email] RESEND_API_KEY no definido; no se envía ...`. Si Resend rechaza un envío, revisa la API key y que el dominio de `EMAIL_FROM` esté verificado en tu cuenta.
@@ -115,6 +130,8 @@ Sin `RESEND_API_KEY` verás en consola `[email] RESEND_API_KEY no definido; no s
 |---|---|
 | `Faltan variables de entorno obligatorias: JWT_SECRET` | Falta `Backend/.env` o la variable |
 | `No se pudo iniciar el servidor: ... ECONNREFUSED` | `MONGO_URI` incorrecta o Mongo no está arrancado |
+| `400 El enlace no es válido o ha caducado` | El token ya se usó, pasó más de 1 hora, o se pidió un enlace más reciente (invalida el anterior) |
+| No llega el correo de recuperación | Falta `RESEND_API_KEY`, la cuenta está desactivada, o se pidió hace menos de 1 minuto |
 | `401 Token no válido` | El token caducó (1 h) o `JWT_SECRET` cambió desde que se emitió |
 | `403` al editar un usuario | Solo puedes editar tu cuenta, y solo `name`, `description`, `studies`, `password` |
 | `403` al crear un horario | Solo los psicólogos (para sí mismos) o los administradores |

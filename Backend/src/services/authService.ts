@@ -1,8 +1,9 @@
+import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import User, { IUser } from '../models/User';
 import { sendEmail } from './emailService';
-import { getJwtSecret } from '../config/env';
+import { getFrontendUrl, getJwtSecret } from '../config/env';
 import { AppError } from '../utils/AppError';
 import { Role } from '../middlewares/auth';
 
@@ -58,4 +59,57 @@ export const loginService = async (email: string, password: string): Promise<str
   }
 
   return jwt.sign({ id: user._id, role: user.role }, getJwtSecret(), { expiresIn: '1h' });
+};
+
+// --- Recuperación de contraseña -------------------------------------------------------------
+
+export const RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // el enlace caduca en 1 hora
+export const RESET_REQUEST_COOLDOWN_MS = 60 * 1000; // como mucho un correo por minuto y cuenta
+export const MIN_PASSWORD_LENGTH = 8;
+
+const hashToken = (token: string): string => crypto.createHash('sha256').update(token).digest('hex');
+
+/**
+ * Genera un token de un solo uso y lo envía por correo. En la base de datos solo se guarda su hash.
+ * No revela si el email existe: si no existe, está desactivado o se pidió hace menos de un minuto,
+ * no hace nada y el controlador responde igual.
+ */
+export const forgotPasswordService = async (email: string): Promise<void> => {
+  const user = await User.findOne({ email }).select('+passwordResetExpires');
+  if (!user || user.isActive === false) return;
+
+  const now = Date.now();
+  const lastRequestAt = user.passwordResetExpires ? user.passwordResetExpires.getTime() - RESET_TOKEN_TTL_MS : 0;
+  if (now - lastRequestAt < RESET_REQUEST_COOLDOWN_MS) return;
+
+  const token = crypto.randomBytes(32).toString('hex');
+  await User.updateOne(
+    { _id: user._id },
+    { passwordResetTokenHash: hashToken(token), passwordResetExpires: new Date(now + RESET_TOKEN_TTL_MS) }
+  );
+
+  // En segundo plano: así la respuesta tarda lo mismo exista o no el email.
+  const resetLink = `${getFrontendUrl()}/reset-password?token=${token}`;
+  sendEmail('resetPassword', user.email, user.name, resetLink).catch((error) => {
+    console.error('Error al enviar el correo de recuperación de contraseña:', error);
+  });
+};
+
+/** Cambia la contraseña con un token válido, no caducado y sin usar. El token se consume. */
+export const resetPasswordService = async (token: string, newPassword: string): Promise<void> => {
+  if (newPassword.length < MIN_PASSWORD_LENGTH) {
+    throw new AppError(400, `La contraseña debe tener al menos ${MIN_PASSWORD_LENGTH} caracteres`);
+  }
+
+  // Una sola operación atómica: dos peticiones con el mismo token no pueden usarlo a la vez.
+  const user = await User.findOneAndUpdate(
+    { passwordResetTokenHash: hashToken(token), passwordResetExpires: { $gt: new Date() }, isActive: { $ne: false } },
+    {
+      password: await hashPassword(newPassword),
+      $unset: { passwordResetTokenHash: '', passwordResetExpires: '' },
+    }
+  );
+  if (!user) {
+    throw new AppError(400, 'El enlace no es válido o ha caducado');
+  }
 };

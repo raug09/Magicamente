@@ -1,17 +1,24 @@
+const escapeHtml = (text: string): string =>
+  text.replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]!);
+
 export const emailTemplates = {
   confirmation: (name: string) => ({
     subject: 'Confirmación de Registro',
-    html: `<p>Hola ${name},</p><p>Tu registro ha sido exitoso.</p>`,
+    html: `<p>Hola ${escapeHtml(name)},</p><p>Tu registro ha sido exitoso.</p>`,
   }),
 
   resetPassword: (name: string, resetLink: string) => ({
     subject: 'Restablecimiento de Contraseña',
-    html: `<p>Hola ${name},</p><p>Puedes restablecer tu contraseña <a href="${resetLink}">aquí</a>.</p>`,
+    html:
+      `<p>Hola ${escapeHtml(name)},</p>` +
+      `<p>Recibimos una solicitud para restablecer tu contraseña. Puedes hacerlo <a href="${escapeHtml(resetLink)}">aquí</a>. ` +
+      'El enlace caduca en 1 hora y solo se puede usar una vez.</p>' +
+      '<p>Si no fuiste tú, ignora este correo: tu contraseña no cambiará.</p>',
   }),
 
   appointmentReminder: (name: string, date: string, hour: string) => ({
     subject: 'Recordatorio de cita',
-    html: `<p>Hola ${name},</p><p>Recuerda que tienes una cita el ${date} a las ${hour}.</p>`,
+    html: `<p>Hola ${escapeHtml(name)},</p><p>Recuerda que tienes una cita el ${escapeHtml(date)} a las ${escapeHtml(hour)}.</p>`,
   }),
 };
 
