@@ -2,7 +2,63 @@
 
 Documento pensado para quien construya el frontend (persona o sesión de Claude) **sin haber visto el backend**. Contiene el contrato de la API, los flujos de pantalla, los casos límite y lo que falta. La referencia completa de endpoints está en [03 · API](03-api.md); aquí está lo que el frontend necesita para usarla bien.
 
-> El repositorio todavía **no tiene frontend**. Sugerencia: crear una carpeta `Frontend/` en este mismo repositorio (un solo repo, un solo CI, la documentación a mano). Si prefieres un repositorio aparte, esta guía y `docs/03-api.md` son lo único que hay que copiar.
+## Estado del frontend
+
+El frontend vive en **`Frontend/`** (este mismo repositorio, un solo CI). Hoy existe el **MVP del paciente**:
+
+- Registro, confirmación de email, login y cierre de sesión.
+- Listado de psicólogos con búsqueda y paginación.
+- Horarios libres de un psicólogo, agrupados por día y en la zona horaria del usuario, y reserva de una cita.
+- Mis citas (paginadas) con cancelación.
+
+Todavía **no** están: recuperar contraseña, cambiar email, sesiones abiertas, perfil y zona horaria, la agenda del psicólogo, la verificación con subida de documentos y el panel de administración. Son las siguientes fases (ver §9).
+
+### Decisiones tomadas
+
+| Tema | Decisión |
+|---|---|
+| Stack | Vite + React + TypeScript |
+| Componentes | Mantine 9 |
+| Rutas | React Router 7 |
+| Peticiones | TanStack Query (caché y estados de carga) + un único cliente HTTP en `src/api/client.ts` |
+| Token | `sessionStorage`: se borra al cerrar la pestaña |
+| Tipos de la API | Generados desde `docs/openapi.json` (`npm run api:types`); el CI falla si quedan desactualizados |
+| Textos | Español; código e identificadores en inglés |
+| Publicación | Cloudflare Pages |
+
+### Estructura
+
+```
+Frontend/src/
+  api/         cliente HTTP, tipos generados (schema.d.ts) y atajos (types.ts)
+  auth/        sesión (sessionStorage), proveedor de usuario y rutas protegidas
+  components/  Layout, ErrorAlert
+  features/    una carpeta por área: auth, psychologists, appointments
+  lib/         fechas y zonas horarias (format.ts)
+  test/        configuración de pruebas
+```
+
+### Cómo ejecutarlo
+
+```bash
+cd Backend && npm run dev        # API en http://localhost:3000
+cd Frontend && npm install && npm run dev   # http://localhost:5173
+```
+
+En desarrollo, Vite reenvía `/api` al backend, así que **no hace falta CORS**. El backend solo se necesita configurar para producción (ver abajo).
+
+### Publicar en Cloudflare Pages
+
+- Carpeta raíz: `Frontend` · comando de compilación: `npm run build` · carpeta de salida: `dist`.
+- Variable de compilación: `VITE_API_URL=https://<tu-api>` (la dirección pública del backend).
+- En el backend, `CORS_ORIGIN` debe incluir la dirección de Pages (p. ej. `https://magicamente.pages.dev`), o el navegador bloqueará las peticiones.
+- Las rutas de la app (`/citas`, `/psicologos/...`) necesitan que Pages sirva `index.html` para cualquier ruta. Vite lo gestiona en producción; si al recargar sale un 404, añade un archivo `_redirects` con `/* /index.html 200` en `Frontend/public/`.
+
+### Pruebas
+
+- `npm test`: pruebas unitarias (cliente HTTP, fechas y zonas horarias).
+- Recorrido del paciente probado en Chromium con la API simulada (registro → login → reserva → cancelación).
+- Pendiente: pruebas de extremo a extremo contra el backend real (Playwright, carpeta `Frontend/e2e/`).
 
 ## 1. Datos de conexión
 
@@ -323,11 +379,15 @@ npm install && npm run dev             # http://localhost:3000
 - [x] Paginación en “mis citas”.
 - [x] Documentación OpenAPI/Swagger generada: `docs/openapi.json` y `/api/docs` (ver §8 para generar los tipos).
 
-### Frontend (todo)
+### Frontend
 
-- [ ] Elegir stack (sugerencia: Vite + React + TypeScript; el CORS por defecto ya apunta al puerto de Vite `5173`).
-- [ ] Cliente HTTP con cabecera `Authorization`, manejo global de `401` (→ login) y de `429` (`Retry-After`).
-- [ ] Pantallas de §4, empezando por registro/login → listado de psicólogos → reserva → mis citas.
-- [ ] Ruta `/reset-password` que lea `token` de la URL.
-- [ ] Mostrar fechas con `startsAt`/`time` y `Intl.DateTimeFormat` (§6); selector de zona horaria en el perfil.
-- [ ] Tests (por ejemplo, Vitest + Testing Library) y un job de CI para el frontend en `.github/workflows/`.
+- [x] Stack elegido (Vite + React + TypeScript, Mantine, React Router, TanStack Query).
+- [x] Cliente HTTP con `Authorization`, `401` → cierra sesión, `429` con `Retry-After`.
+- [x] MVP del paciente: registro, confirmación de email, login, listado, reserva y mis citas.
+- [x] Mostrar fechas con `startsAt`/`time` y `Intl.DateTimeFormat` en la zona del usuario (§6).
+- [x] Pruebas unitarias y job de CI (`.github/workflows/frontend.yml`), que además comprueba que los tipos de la API no se han quedado viejos.
+- [ ] Fase 2: recuperar contraseña (`/reset-password` lee `token` de la URL), cambiar email, sesiones abiertas.
+- [ ] Fase 3: perfil con selector de zona horaria; agenda del psicólogo (crear, repetir, mover, borrar).
+- [ ] Fase 4: verificación del psicólogo (estado, motivo de rechazo, subida de documentos).
+- [ ] Fase 5: panel de administrador (usuarios, revisión de documentos).
+- [ ] Pruebas de extremo a extremo con Playwright contra el backend real.

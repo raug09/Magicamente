@@ -1,0 +1,39 @@
+name: Frontend
+
+on:
+  push:
+    paths:
+      - 'Frontend/**'
+      - 'docs/openapi.json'
+      - '.github/workflows/frontend.yml'
+  pull_request:
+    paths:
+      - 'Frontend/**'
+      - 'docs/openapi.json'
+      - '.github/workflows/frontend.yml'
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: Frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: Frontend/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run format:check
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+      # Los tipos de la API deben coincidir con docs/openapi.json (si cambió el backend, regenerar con `npm run api:types`).
+      - name: Tipos de la API al día
+        run: |
+          npm run api:types
+          git diff --exit-code -- src/api/schema.d.ts || (echo "Regenera los tipos: npm run api:types" && exit 1)
