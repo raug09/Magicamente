@@ -184,7 +184,7 @@ Revisa cada grupo antes de borrar: conserva la franja que tenga cita (`db.appoin
 
 ## Probar el envío de correos con Resend
 
-El CI incluye una prueba de envío real (paso «Envío real de correos» del job `test`). Solo se ejecuta si el repositorio tiene el secreto `RESEND_API_KEY` (Settings → Secrets and variables → Actions). Envía las cuatro plantillas a `RESEND_SMOKE_TO` (variable del repositorio; por defecto `delivered@resend.dev`, que descarta el correo) con el remitente `onboarding@resend.dev`, porque el dominio propio tiene que estar verificado en Resend.
+Hay un workflow manual, **Envío real de correos (Resend)** (`.github/workflows/email-smoke.yml`), que se lanza a mano desde Actions → *Run workflow*. **No se ejecuta en cada push**: cada ejecución envía correos de verdad. Necesita el secreto `RESEND_API_KEY` (Settings → Secrets and variables → Actions). Envía las cuatro plantillas a `RESEND_SMOKE_TO` (variable del repositorio; por defecto `delivered@resend.dev`, que descarta el correo) con el remitente `onboarding@resend.dev`, porque el dominio propio tiene que estar verificado en Resend.
 
 Para probarlo en local: `RESEND_API_KEY=… RESEND_SMOKE_TO=tu@correo.com npx ts-node --transpile-only scripts/email-smoke.ts` desde `Backend/`.
 

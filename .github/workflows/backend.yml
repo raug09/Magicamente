@@ -22,21 +22,7 @@ jobs:
       - run: npm run typecheck
       - run: npm run build
       - run: npm test
-      # Prueba de envío real con Resend. Solo corre si el repositorio tiene el secreto RESEND_API_KEY.
-      # (El contexto `secrets` no se puede usar en `if:`: se comprueba en un paso previo.)
-      - name: Comprobar si hay clave de Resend
-        id: resend
-        env:
-          RESEND_KEY: ${{ secrets.RESEND_API_KEY }}
-        run: |
-          if [ -n "$RESEND_KEY" ]; then echo "available=true" >> "$GITHUB_OUTPUT"; else echo "available=false" >> "$GITHUB_OUTPUT"; fi
-      - name: Envío real de correos (Resend)
-        if: steps.resend.outputs.available == 'true'
-        env:
-          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
-          RESEND_SMOKE_TO: ${{ vars.RESEND_SMOKE_TO || 'delivered@resend.dev' }}
-          EMAIL_FROM: 'Soporte <onboarding@resend.dev>'
-        run: npx ts-node --transpile-only scripts/email-smoke.ts
+
 
   # Comprueba de extremo a extremo lo que los tests no cubren: que la imagen Docker se construye,
   # que el servidor arranca de verdad contra una MongoDB real (migraciones incluidas) y responde.

@@ -1,0 +1,34 @@
+name: Envío real de correos (Resend)
+
+# Manual: NO se ejecuta en cada push (enviaría correos cada vez).
+# Lánzalo desde Actions → "Envío real de correos (Resend)" → Run workflow.
+on:
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: Backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: Backend/package-lock.json
+      - run: npm ci
+      - name: Comprobar si hay clave de Resend
+        id: resend
+        env:
+          RESEND_KEY: ${{ secrets.RESEND_API_KEY }}
+        run: |
+          if [ -n "$RESEND_KEY" ]; then echo "available=true" >> "$GITHUB_OUTPUT"; else echo "available=false" >> "$GITHUB_OUTPUT"; fi
+      - name: Enviar las plantillas
+        if: steps.resend.outputs.available == 'true'
+        env:
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          RESEND_SMOKE_TO: ${{ vars.RESEND_SMOKE_TO || 'delivered@resend.dev' }}
+          EMAIL_FROM: 'Soporte <onboarding@resend.dev>'
+        run: npx ts-node --transpile-only scripts/email-smoke.ts
