@@ -252,6 +252,8 @@ Los botones de los correos llevan a estas rutas de `FRONTEND_URL`. El frontend d
 | `/citas` | Recordatorio de cita | Mis citas |
 | `/psicologos` | Aviso de cita cancelada | Listado de psicólogos |
 | `/confirm-email-change?token=…` | Confirmación de nuevo email | Llama a `POST /auth/confirm-email-change` |
+| `/agenda` | Cuenta de psicólogo aprobada | Agenda del psicólogo |
+| `/perfil` | Solicitud de psicólogo rechazada | Perfil con el motivo y los documentos |
 
 Las dos últimas son nombres elegidos por el backend; si el frontend usa otras rutas, dilo y se cambian en `config/emailTemplates.ts`.
 

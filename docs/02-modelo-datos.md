@@ -111,3 +111,12 @@ Una sesión por cada login. El JWT lleva su `jti`; si la sesión no existe, el t
 | `createdAt` | Date | |
 | `expiresAt` | Date | Igual que la caducidad del token (1 h). Índice TTL: MongoDB borra las caducadas |
 
+### Verificación de psicólogos (campos de `User`)
+
+| Campo | Notas |
+|---|---|
+| `verificationStatus` | `pendiente` (por defecto para psicólogos), `rechazado` o `aprobado`. Los demás roles quedan `aprobado` |
+| `approved` | **Derivado**: `true` solo si `verificationStatus` es `aprobado`. Lo actualiza solo el servicio de verificación; las consultas que filtran psicólogos usan este campo |
+| `verificationMessage` | Motivo del rechazo, visible para el psicólogo |
+| `verificationDocuments` | Lista de `{ key, status, note }`: `key` ∈ `tarjeta_profesional`, `cedula`, `diploma`; `status` ∈ `pendiente`, `ok`, `rechazado` |
+

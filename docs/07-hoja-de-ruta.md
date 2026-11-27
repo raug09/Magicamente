@@ -76,7 +76,13 @@ Pendiente de probar de extremo a extremo: los correos reales (hace falta `RESEND
 
 - Formato único de las listas `{ total, page, limit, pages, items }` en `GET /psychologists`, `GET /schedule/:id` y `GET /appointments/appointment` (límite 50).
 
+## ✅ Hecho: verificación de psicólogos
+
+- Estados pendiente, rechazado y aprobado. Aprobar exige los tres documentos correctos; rechazar exige un motivo y resalta el documento causante en el correo.
+
 ## Pendientes de producto
+
+- [ ] Subida de los documentos desde la app: archivos, almacenamiento y privacidad (son documentos de identidad).
 
 - [ ] **Pago de las citas.** No existe ningún cobro. Hay que decidir: ¿quién cobra (la plataforma o el psicólogo)?, ¿cuándo (al reservar o antes de la cita)?, ¿qué pasa con cancelaciones y reembolsos?, ¿qué pasarela (Stripe, MercadoPago, Wompi u otra) y en qué países?, ¿comisión de la plataforma?
 - [ ] ¿Quién aprueba a los psicólogos y con qué criterios (títulos, licencia)? Hoy lo hace un administrador a mano.

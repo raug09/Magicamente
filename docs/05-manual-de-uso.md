@@ -112,6 +112,20 @@ curl -s -X PATCH $API/api/appointments/appointment/update/$APPOINTMENT_ID -H "Au
   -H 'Content-Type: application/json' -d '{"state":"completada"}'
 ```
 
+## Verificar un psicólogo
+
+Un psicólogo nuevo queda `pendiente`. Como administrador, revisa sus documentos y decide:
+
+```bash
+# Aprobar (los tres documentos deben estar en ok)
+curl -X PUT $API/api/users/<id>/verification -H "Authorization: Bearer $ADMIN_TOKEN" -H 'Content-Type: application/json' \
+  -d '{"status":"aprobado","documents":[{"key":"tarjeta_profesional","status":"ok"},{"key":"cedula","status":"ok"},{"key":"diploma","status":"ok"}]}'
+
+# Rechazar, con motivo y el documento señalado
+curl -X PUT $API/api/users/<id>/verification -H "Authorization: Bearer $ADMIN_TOKEN" -H 'Content-Type: application/json' \
+  -d '{"status":"rechazado","message":"La tarjeta no se lee bien.","documents":[{"key":"tarjeta_profesional","status":"rechazado","note":"Imagen borrosa"}]}'
+```
+
 ## Crear el primer administrador
 
 El registro público ya no permite el rol `administrador`. Regístrate como paciente y promuévete a mano en la base de datos:
