@@ -114,7 +114,7 @@ curl -s -X POST $API/api/auth/reset-password -H 'Content-Type: application/json'
   -d '{"token":"<TOKEN>","password":"nueva-clave-123"}'
 ```
 
-Sin `RESEND_API_KEY` el correo no se envía; en desarrollo puedes sacar el enlace del log del servidor: el aviso de consola solo indica que no se envió, así que lo más práctico es configurar una clave de Resend de pruebas. La contraseña nueva debe tener al menos 8 caracteres.
+Sin `RESEND_API_KEY` el correo **no se envía** y el token no aparece en ningún log (a propósito), así que para probar el flujo completo hace falta una clave de Resend. Los tests automáticos no la necesitan: interceptan el correo. La contraseña nueva debe tener al menos 8 caracteres.
 
 ## Correos
 
