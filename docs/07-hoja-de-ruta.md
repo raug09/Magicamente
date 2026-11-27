@@ -52,7 +52,7 @@ Las referencias (S1, F2…) apuntan a [06 · Problemas conocidos](06-problemas-c
 
 ## Calidad y despliegue
 
-- [ ] ESLint + Prettier.
+- [x] ESLint (en CI). Prettier: pendiente; aplicarlo de golpe reformatea todo el código, así que conviene hacerlo en un commit aparte.
 - [ ] Documentación OpenAPI/Swagger.
 
 ## ✅ Hecho: críticos (en curso de revisión)

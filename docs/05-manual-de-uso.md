@@ -60,6 +60,7 @@ Deberías ver `Conectado a MongoDB` y `Servidor escuchando en el puerto 3000`. S
 ```bash
 npm test             # tests de integración
 npm run typecheck    # tipos de src/ y tests/
+npm run lint         # ESLint sobre src/, tests/ y scripts/
 ```
 
 Los tests arrancan una MongoDB en memoria: **no necesitan** tu base de datos ni tu `.env`. La primera vez descargan el binario de MongoDB (~100 MB) desde `fastdl.mongodb.org`, así que hace falta conexión a internet. GitHub Actions los ejecuta en cada push (`.github/workflows/backend.yml`).
