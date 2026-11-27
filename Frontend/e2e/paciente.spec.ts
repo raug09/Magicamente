@@ -66,3 +66,54 @@ test('salir borra la sesión', async ({ page }) => {
   await expect(page).toHaveURL(/\/entrar$/);
   expect(await page.evaluate(() => sessionStorage.getItem('magicamente.token'))).toBeNull();
 });
+
+test('recuperar contraseña: pide el enlace sin revelar si la cuenta existe', async ({ page }) => {
+  await page.goto('/entrar');
+  await page.getByRole('link', { name: '¿Olvidaste tu contraseña?' }).click();
+  await expect(page).toHaveURL(/\/recuperar$/);
+  await page.getByLabel('Email').fill('no-existe.e2e@example.com');
+  await page.getByRole('button', { name: 'Enviar enlace' }).click();
+  await expect(page.getByRole('alert')).toContainText('Si el email está registrado');
+});
+
+test('restablecer contraseña con un enlace no válido muestra el error', async ({ page }) => {
+  await page.goto('/reset-password?token=token-que-no-existe');
+  await page.getByLabel('Contraseña nueva', { exact: true }).fill('nueva-clave-123');
+  await page.getByLabel('Repite la contraseña').fill('nueva-clave-123');
+  await page.getByRole('button', { name: 'Cambiar contraseña' }).click();
+  await expect(page.getByRole('alert')).toContainText('no es válido');
+});
+
+test('las contraseñas que no coinciden se avisan antes de enviar', async ({ page }) => {
+  await page.goto('/reset-password?token=abc');
+  await page.getByLabel('Contraseña nueva', { exact: true }).fill('nueva-clave-123');
+  await page.getByLabel('Repite la contraseña').fill('otra-clave-456');
+  await expect(page.getByText('No coincide con la contraseña')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Cambiar contraseña' })).toBeDisabled();
+});
+
+test('cambiar email: con contraseña incorrecta muestra error; con la correcta pide confirmación', async ({ page }) => {
+  await login(page, PATIENT_EMAIL, PASSWORD);
+  await expect(page).toHaveURL(/\/psicologos$/);
+  await page.getByRole('link', { name: 'Mi cuenta' }).click();
+
+  await page.getByLabel('Nuevo email').fill(`cambio.${Date.now()}@example.com`);
+  await page.getByLabel('Contraseña actual').fill('clave-equivocada-123');
+  await page.getByRole('button', { name: 'Enviar enlace de confirmación' }).click();
+  await expect(page.getByRole('alert').first()).toBeVisible();
+
+  await page.getByLabel('Contraseña actual').fill(PASSWORD);
+  await page.getByRole('button', { name: 'Enviar enlace de confirmación' }).click();
+  await expect(page.getByText('Revisa la nueva dirección')).toBeVisible();
+});
+
+test('mi cuenta: muestra la sesión actual y permite cerrar todas las sesiones', async ({ page }) => {
+  await login(page, PATIENT_EMAIL, PASSWORD);
+  await expect(page).toHaveURL(/\/psicologos$/);
+  await page.getByRole('link', { name: 'Mi cuenta' }).click();
+  await expect(page.getByText('Esta sesión')).toBeVisible();
+
+  await page.getByRole('button', { name: 'Cerrar todas' }).click();
+  await expect(page).toHaveURL(/\/entrar$/);
+  expect(await page.evaluate(() => sessionStorage.getItem('magicamente.token'))).toBeNull();
+});

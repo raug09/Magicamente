@@ -6,7 +6,7 @@ import { ErrorAlert } from '../../components/ErrorAlert';
 
 type VerifyState = { status: 'loading' } | { status: 'ok'; message: string } | { status: 'error'; error: unknown };
 
-/** Destino del enlace del correo de confirmación: /verificar-email?token=... */
+/** Destino del enlace del correo de confirmación: /verify-email?token=... (la ruta que envía el backend). */
 export function VerifyEmailPage() {
   const [params] = useSearchParams();
   const token = params.get('token') ?? '';

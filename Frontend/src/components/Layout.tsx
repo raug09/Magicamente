@@ -29,6 +29,9 @@ export function Layout({ children }: { children: ReactNode }) {
                   <Anchor component={Link} to="/citas">
                     Mis citas
                   </Anchor>
+                  <Anchor component={Link} to="/cuenta">
+                    Mi cuenta
+                  </Anchor>
                   <Text size="sm" c="dimmed" visibleFrom="sm">
                     {user.name}
                   </Text>

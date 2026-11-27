@@ -11,7 +11,9 @@ El frontend vive en **`Frontend/`** (este mismo repositorio, un solo CI). Hoy ex
 - Horarios libres de un psicólogo, agrupados por día y en la zona horaria del usuario, y reserva de una cita.
 - Mis citas (paginadas) con cancelación.
 
-Todavía **no** están: recuperar contraseña, cambiar email, sesiones abiertas, perfil y zona horaria, la agenda del psicólogo, la verificación con subida de documentos y el panel de administración. Son las siguientes fases (ver §9).
+Fase 2 (también): recuperar contraseña, restablecerla con el enlace del correo, cambiar email (con confirmación por correo), y mi cuenta con las sesiones abiertas (cerrar una o todas).
+
+Todavía **no** están: perfil y zona horaria, la agenda del psicólogo, la verificación con subida de documentos y el panel de administración. Son las siguientes fases (ver §9).
 
 ### Decisiones tomadas
 
@@ -386,8 +388,10 @@ npm install && npm run dev             # http://localhost:3000
 - [x] MVP del paciente: registro, confirmación de email, login, listado, reserva y mis citas.
 - [x] Mostrar fechas con `startsAt`/`time` y `Intl.DateTimeFormat` en la zona del usuario (§6).
 - [x] Pruebas unitarias y job de CI (`.github/workflows/frontend.yml`), que además comprueba que los tipos de la API no se han quedado viejos.
-- [ ] Fase 2: recuperar contraseña (`/reset-password` lee `token` de la URL), cambiar email, sesiones abiertas.
+- [x] Fase 2: recuperar contraseña (`/recuperar`, y `/reset-password` lee `token` de la URL), cambiar email (`/confirm-email-change`), mi cuenta con sesiones abiertas (`/cuenta`).
+- [x] Rutas de los correos alineadas con el backend: `/verify-email`, `/reset-password`, `/confirm-email-change`.
 - [ ] Fase 3: perfil con selector de zona horaria; agenda del psicólogo (crear, repetir, mover, borrar).
+- [ ] Rutas que el backend ya envía en correos y que el frontend aún no tiene: `/agenda` (aprobación del psicólogo) y `/perfil` (rechazo con motivo).
 - [ ] Fase 4: verificación del psicólogo (estado, motivo de rechazo, subida de documentos).
 - [ ] Fase 5: panel de administrador (usuarios, revisión de documentos).
 - [x] Pruebas de extremo a extremo con Playwright contra el backend real (job `e2e` en CI).

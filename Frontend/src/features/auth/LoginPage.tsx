@@ -60,6 +60,9 @@ export function LoginPage() {
           <Button type="submit" loading={submitting}>
             Entrar
           </Button>
+          <Anchor component={Link} to="/recuperar" size="sm">
+            ¿Olvidaste tu contraseña?
+          </Anchor>
         </Stack>
       </form>
       <Text size="sm" mt="md">
