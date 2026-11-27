@@ -57,8 +57,8 @@ En desarrollo, Vite reenvía `/api` al backend, así que **no hace falta CORS**.
 ### Pruebas
 
 - `npm test`: pruebas unitarias (cliente HTTP, fechas y zonas horarias).
-- Recorrido del paciente probado en Chromium con la API simulada (registro → login → reserva → cancelación).
-- Pendiente: pruebas de extremo a extremo contra el backend real (Playwright, carpeta `Frontend/e2e/`).
+- **Extremo a extremo** (`npm run e2e`, carpeta `Frontend/e2e/`): Playwright contra el backend real y MongoDB. En el CI lo hace el job `e2e` de `.github/workflows/frontend.yml`, que siembra los datos con `Backend/scripts/e2e-seed.ts`. Cubre: sin sesión → login, contraseña incorrecta, registro, buscar → reservar → cancelar y salir.
+- Para ejecutarlo en local: MongoDB en marcha, `Backend` arrancado con `.env` y `npx ts-node --transpile-only scripts/e2e-seed.ts`, y luego `npm run e2e` en `Frontend/`.
 
 ## 1. Datos de conexión
 
@@ -390,4 +390,4 @@ npm install && npm run dev             # http://localhost:3000
 - [ ] Fase 3: perfil con selector de zona horaria; agenda del psicólogo (crear, repetir, mover, borrar).
 - [ ] Fase 4: verificación del psicólogo (estado, motivo de rechazo, subida de documentos).
 - [ ] Fase 5: panel de administrador (usuarios, revisión de documentos).
-- [ ] Pruebas de extremo a extremo con Playwright contra el backend real.
+- [x] Pruebas de extremo a extremo con Playwright contra el backend real (job `e2e` en CI).
