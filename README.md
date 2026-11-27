@@ -41,3 +41,4 @@ npm test                # tests de integración (descarga MongoDB la primera vez
 | [06 · Problemas conocidos](docs/06-problemas-conocidos.md) | Fallos, riesgos de seguridad y deuda técnica, por prioridad |
 | [07 · Hoja de ruta](docs/07-hoja-de-ruta.md) | Plan propuesto para retomar el proyecto |
 | [08 · Guía para el frontend](docs/08-guia-frontend.md) | Contrato de la API por pantalla, sesión, errores, zonas horarias y pendientes para construir el frontend |
+| [09 · Despliegue](docs/09-despliegue.md) | Publicar con servicios gratuitos (Atlas, Render, Cloudflare Pages), variables de entorno y límites |

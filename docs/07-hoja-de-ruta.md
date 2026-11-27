@@ -89,6 +89,10 @@ Pendiente de probar de extremo a extremo: los correos reales (hace falta `RESEND
 - [ ] ¿Quién aprueba a los psicólogos y con qué criterios (títulos, licencia)? Hoy lo hace un administrador a mano.
 - [ ] ¿Se notifica al psicólogo cuando lo aprueban o lo rechazan?
 
+## Despliegue
+
+- [ ] Publicar el MVP para pruebas con servicios gratuitos, siguiendo [09 · Despliegue](09-despliegue.md) (requiere cuentas en Atlas, Render y Cloudflare Pages). El backend gratuito se duerme y no ejecuta los recordatorios: no es apto para pacientes reales.
+
 ## Frontend
 
 El MVP del paciente está en `Frontend/` (registro, reserva y mis citas). Su estado, decisiones y fases pendientes están en [08 · Guía para el frontend](08-guia-frontend.md).

@@ -51,6 +51,8 @@ En desarrollo, Vite reenvía `/api` al backend, así que **no hace falta CORS**.
 
 ### Publicar en Cloudflare Pages
 
+La guía completa (base de datos, backend y frontend, en orden) está en [09 · Despliegue](09-despliegue.md). Resumen:
+
 - Carpeta raíz: `Frontend` · comando de compilación: `npm run build` · carpeta de salida: `dist`.
 - Variable de compilación: `VITE_API_URL=https://<tu-api>` (la dirección pública del backend).
 - En el backend, `CORS_ORIGIN` debe incluir la dirección de Pages (p. ej. `https://magicamente.pages.dev`), o el navegador bloqueará las peticiones.
