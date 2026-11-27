@@ -57,11 +57,11 @@ export const registerSchema = z.object({
 
 export const loginSchema = z.object({ email: emailField, password: passwordField });
 
-export const forgotPasswordSchema = z.object({ email: emailField });
+export const forgotPasswordSchema = z.object({ email: validEmail });
 
 export const verifyEmailSchema = z.object({ token: text('token', 200) });
 
-export const resendVerificationSchema = z.object({ email: emailField });
+export const resendVerificationSchema = z.object({ email: validEmail });
 
 export const resetPasswordSchema = z.object({
   token: text('token', 200),
