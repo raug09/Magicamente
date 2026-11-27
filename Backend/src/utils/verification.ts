@@ -20,11 +20,23 @@ export type VerificationStatus = (typeof VERIFICATION_STATUSES)[number];
 export const DOCUMENT_REVIEW_STATUSES = ['pendiente', 'ok', 'rechazado'] as const;
 export type DocumentReviewStatus = (typeof DOCUMENT_REVIEW_STATUSES)[number];
 
+/** Archivo guardado en el almacenamiento privado. `storageKey` es interno: nunca se envía al cliente. */
+export interface StoredFile {
+  storageKey: string;
+  contentType: string;
+  size: number;
+  uploadedAt: Date;
+}
+
 export interface DocumentReview {
   key: DocumentKey;
   status: DocumentReviewStatus;
   note?: string;
+  file?: StoredFile;
 }
+
+/** Los documentos rechazados se borran del almacenamiento pasados estos días sin corregir. */
+export const REJECTED_DOCUMENT_RETENTION_DAYS = 30;
 
 /** Revisión inicial: todos los documentos sin revisar. */
 export const initialDocumentReviews = (): DocumentReview[] =>

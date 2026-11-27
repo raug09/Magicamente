@@ -149,6 +149,15 @@ Cada endpoint declara su esquema en `validation/schemas.ts` y la ruta lo aplica 
 
 `utils/logger.ts` (pino): una línea JSON por evento. Nivel con `LOG_LEVEL` (`info` por defecto; `silent` en los tests). En desarrollo, `npm run dev:pretty` los muestra legibles. Los datos personales no se registran (ni emails de destinatarios, ni cuerpos de petición, ni la query string).
 
+## Almacenamiento de documentos
+
+`storage/documentStorage.ts` define la interfaz (`put`, `signedUrl`, `remove`) y `storage/r2Storage.ts` la implementa con Cloudflare R2 a través de su API compatible con S3 (`@aws-sdk/client-s3`). Si faltan las variables `R2_*`, `getStorage()` lanza `503`. Los tests inyectan un almacenamiento en memoria con `setStorage`.
+
+- Los archivos llegan con `multer` en memoria (máx. 5 MB, uno solo) y se validan por su **contenido** (`utils/fileType.ts`: PDF, JPG, PNG).
+- La clave en el bucket es `verification/<idUsuario>/<documento>/<uuid>.<ext>`: no lleva el nombre original del archivo.
+- La clave interna **nunca** sale en las respuestas (el `toJSON` de `User` la oculta). Para abrir un archivo se genera un enlace temporal de 5 minutos y se registra el acceso en `DocumentAccessLog`.
+- Una tarea nocturna (03:00) borra los documentos de solicitudes rechazadas hace más de 30 días y los de cuentas eliminadas.
+
 ## Correo
 
 `services/emailService.ts` → `sendEmail(plantilla, destinatario, ...args)`, tipado según la plantilla. El cliente de Resend se crea la primera vez que hace falta. **Sin `RESEND_API_KEY` no se envía nada**: se escribe un aviso en consola, útil en desarrollo y en los tests.

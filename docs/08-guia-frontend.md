@@ -241,6 +241,37 @@ Ya se pueden crear franjas para **hoy** (en el calendario del psicólogo) siempr
 
 Errores: `400 “La contraseña no es correcta”` (muestra el error en el formulario; **no** cierres la sesión: es un 400, no un 401), `409 “Ese email ya está en uso”`.
 
+### Verificación del psicólogo y subida de documentos
+
+`verificationStatus` en `GET /api/auth/me`:
+
+| Estado | Qué ve el psicólogo | Qué puede hacer |
+|---|---|---|
+| `pendiente` | “Tu cuenta está pendiente de aprobación” | Iniciar sesión, subir documentos. No publica franjas ni aparece en el listado |
+| `rechazado` | El `verificationMessage` y sus documentos | Corregir y volver a subir los señalados |
+| `aprobado` | — | Todo. Ya **no puede cambiar** sus documentos (409) |
+
+`verificationDocuments` lista los tres documentos (`tarjeta_profesional`, `cedula`, `diploma`) con su `status` (`pendiente`, `ok` o `rechazado`), su `note` y, si ya lo subió, `file: { contentType, size, uploadedAt }`. **Resalta los rechazados** y muestra la nota. Los psicólogos aprobados se ven por `approved: true`.
+
+**Subir un documento** — `PUT /api/verification/documents/:key`, `multipart/form-data`, archivo en el campo `file`:
+
+```ts
+const form = new FormData();
+form.append('file', fileInput.files[0]);          // PDF, JPG o PNG, máx. 5 MB
+await fetch(`${API}/api/verification/documents/cedula`, {
+  method: 'PUT',
+  headers: { Authorization: `Bearer ${token}` },   // NO pongas Content-Type: el navegador lo añade con el boundary
+  body: form,
+});
+```
+
+- Valida en el formulario el tipo y el tamaño (5 MB) para avisar antes de subir; el servidor los vuelve a comprobar y responde `400` (formato) o `413` (tamaño).
+- Corregir un documento de una solicitud rechazada la devuelve a `pendiente` automáticamente.
+- **Ver un documento ya subido:** `GET /api/verification/documents/:key/url` devuelve `{ url, expiresInSeconds }`. Abre esa URL enseguida (caduca a los 5 minutos); no la guardes ni la compartas.
+- **Administrador:** `GET /api/users/:id/verification/documents/:key/url` abre el de cualquier psicólogo. Después decide con `PUT /api/users/:id/verification`.
+- Si el servidor responde `503` al subir, el almacenamiento no está configurado: muestra un aviso de “servicio no disponible”.
+- **Retención:** si la solicitud sigue rechazada 30 días sin corregirla, los archivos se borran y el psicólogo debe subirlos otra vez. Muéstralo si ves documentos rechazados sin `file`.
+
 ### Rutas a las que apuntan los correos
 
 Los botones de los correos llevan a estas rutas de `FRONTEND_URL`. El frontend debe crearlas con estos nombres:

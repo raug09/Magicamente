@@ -82,7 +82,8 @@ Pendiente de probar de extremo a extremo: los correos reales (hace falta `RESEND
 
 ## Pendientes de producto
 
-- [ ] Subida de los documentos desde la app: archivos, almacenamiento y privacidad (son documentos de identidad).
+- [x] Subida de documentos a Cloudflare R2 (privado, enlaces de 5 minutos, accesos registrados, 30 días de retención para rechazados). Falta probarla contra R2 real con las credenciales.
+- [ ] Revisar con un abogado la política de datos: consentimiento para tratar documentos de identidad (Ley 1581) y plazo de retención de los aprobados.
 
 - [ ] **Pago de las citas.** No existe ningún cobro. Hay que decidir: ¿quién cobra (la plataforma o el psicólogo)?, ¿cuándo (al reservar o antes de la cita)?, ¿qué pasa con cancelaciones y reembolsos?, ¿qué pasarela (Stripe, MercadoPago, Wompi u otra) y en qué países?, ¿comisión de la plataforma?
 - [ ] ¿Quién aprueba a los psicólogos y con qué criterios (títulos, licencia)? Hoy lo hace un administrador a mano.

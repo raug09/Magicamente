@@ -35,6 +35,7 @@ export interface IUser extends Document {
   /** Mensaje del equipo cuando se rechaza la solicitud. */
   verificationMessage?: string;
   verificationDocuments?: DocumentReview[];
+  verificationUpdatedAt?: Date;
   pendingEmail?: string;
   emailChangeTokenHash?: string;
   emailChangeExpires?: Date;
@@ -78,8 +79,16 @@ const UserSchema = new Schema<IUser>({
       key: { type: String, enum: PSYCHOLOGIST_DOCUMENT_KEYS, required: true },
       status: { type: String, enum: DOCUMENT_REVIEW_STATUSES, default: 'pendiente' },
       note: { type: String, default: '' },
+      file: {
+        storageKey: { type: String },
+        contentType: { type: String },
+        size: { type: Number },
+        uploadedAt: { type: Date },
+      },
     },
   ],
+  /** Última vez que cambió el estado de verificación (cuenta los 30 días de retención de rechazados). */
+  verificationUpdatedAt: { type: Date },
   pendingEmail: { type: String, select: false },
   emailChangeTokenHash: { type: String, select: false },
   emailChangeExpires: { type: Date, select: false },
@@ -89,6 +98,23 @@ const UserSchema = new Schema<IUser>({
     default: function (this: { role?: string }) {
       return this.role !== 'psicologo';
     },
+  },
+});
+
+// Al convertir a JSON se oculta la clave interna del archivo: el cliente solo ve el tipo, el tamaño y la fecha.
+UserSchema.set('toJSON', {
+  transform: (_doc, ret: Record<string, unknown>) => {
+    if (Array.isArray(ret.verificationDocuments)) {
+      ret.verificationDocuments = ret.verificationDocuments.map((document: Record<string, unknown>) => {
+        const file = document.file as { storageKey?: string; contentType?: string; size?: number; uploadedAt?: Date } | undefined;
+        const { file: _internal, ...rest } = document;
+        void _internal;
+        return file?.storageKey
+          ? { ...rest, file: { contentType: file.contentType, size: file.size, uploadedAt: file.uploadedAt } }
+          : rest;
+      });
+    }
+    return ret;
   },
 });
 

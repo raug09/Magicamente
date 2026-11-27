@@ -112,9 +112,31 @@ curl -s -X PATCH $API/api/appointments/appointment/update/$APPOINTMENT_ID -H "Au
   -H 'Content-Type: application/json' -d '{"state":"completada"}'
 ```
 
+## Almacenamiento de documentos (Cloudflare R2)
+
+Los documentos de verificación de los psicólogos (tarjeta profesional, cédula, diploma) se guardan en un bucket **privado** de Cloudflare R2. Sin configurarlo, la subida responde `503` y todo lo demás funciona igual.
+
+**1. En Cloudflare** (panel → R2 Object Storage):
+- Crea un bucket, por ejemplo `magicamente-documentos`, con **acceso público desactivado** (no actives `r2.dev` ni dominio público).
+- Crea una alerta de uso (almacenamiento) en Notificaciones, con un umbral bajo (p. ej. 1 GB).
+- En *Administrar tokens de API de R2*, crea un token de **cuenta** con permiso **Lectura y escritura de objetos** limitado a **ese bucket**. Guarda el *Access Key ID*, el *Secret Access Key* (solo se muestra una vez) y el id de tu cuenta.
+
+**2. En el servidor**, define estas variables (en `Backend/.env` o en el entorno del despliegue; **nunca** en el repositorio):
+
+| Variable | Valor |
+|---|---|
+| `R2_ACCOUNT_ID` | El id de tu cuenta de Cloudflare |
+| `R2_ACCESS_KEY_ID` | Access Key ID del token |
+| `R2_SECRET_ACCESS_KEY` | Secret Access Key del token |
+| `R2_BUCKET` | `magicamente-documentos` |
+
+**Cómo se protegen los archivos:** el bucket no tiene acceso público; los documentos solo se abren con enlaces temporales (5 minutos) que genera el servidor para su dueño o para un administrador, y cada apertura queda registrada. El tipo de archivo se comprueba por su contenido y los nombres de archivo no se usan en las claves. Los documentos de solicitudes rechazadas se borran a los 30 días y los de cuentas eliminadas, al eliminarlas.
+
+**Para probar que R2 funciona de verdad** (los tests automáticos usan un almacenamiento simulado): arranca el backend con las cuatro variables, regístrate como psicólogo y sube un documento con `curl -X PUT $API/api/verification/documents/cedula -H "Authorization: Bearer $TOKEN" -F "file=@cedula.pdf"`; después pide su enlace con `GET /api/verification/documents/cedula/url` y ábrelo.
+
 ## Verificar un psicólogo
 
-Un psicólogo nuevo queda `pendiente`. Como administrador, revisa sus documentos y decide:
+Un psicólogo nuevo queda `pendiente` y sube sus tres documentos. Como administrador, abre cada uno (`GET /api/users/<id>/verification/documents/<key>/url`), revísalo y decide (para aprobar, los tres archivos deben estar subidos y en `ok`):
 
 ```bash
 # Aprobar (los tres documentos deben estar en ok)

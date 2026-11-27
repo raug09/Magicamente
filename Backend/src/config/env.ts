@@ -67,3 +67,20 @@ export const getTrustProxy = (): number | boolean | undefined => {
   if (value === 'false') return false;
   return /^\d+$/.test(value) ? Number(value) : undefined;
 };
+
+export interface R2Config {
+  accountId: string;
+  accessKeyId: string;
+  secretAccessKey: string;
+  bucket: string;
+}
+
+/** Configuración de Cloudflare R2 para los documentos. Devuelve null si falta alguna variable. */
+export const getR2Config = (): R2Config | null => {
+  const accountId = process.env.R2_ACCOUNT_ID?.trim();
+  const accessKeyId = process.env.R2_ACCESS_KEY_ID?.trim();
+  const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY?.trim();
+  const bucket = process.env.R2_BUCKET?.trim();
+  if (!accountId || !accessKeyId || !secretAccessKey || !bucket) return null;
+  return { accountId, accessKeyId, secretAccessKey, bucket };
+};

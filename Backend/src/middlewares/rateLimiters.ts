@@ -20,4 +20,6 @@ export const createRateLimiters = () => ({
   login: limiter(15 * MINUTE, 10, { skipSuccessfulRequests: true }),
   /** Registro, forgot-password y reset-password: 10 por hora. */
   sensitive: limiter(60 * MINUTE, 10),
+  /** Subida y apertura de documentos de verificación: 30 por hora. */
+  uploads: limiter(60 * MINUTE, 30),
 });

@@ -1,7 +1,9 @@
-import { afterAll, afterEach, beforeAll } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach } from 'vitest';
 import mongoose from 'mongoose';
 import { MongoMemoryServer } from 'mongodb-memory-server';
 import { runMigrations } from '../src/config/migrations';
+import { setStorage } from '../src/storage/documentStorage';
+import { testStorage } from './memoryStorage';
 
 process.env.JWT_SECRET = 'test-secret';
 delete process.env.RESEND_API_KEY; // sin API key, emailService no envía nada
@@ -13,6 +15,11 @@ beforeAll(async () => {
   await mongoose.connect(mongo.getUri());
   await Promise.all(Object.values(mongoose.models).map((model) => model.init())); // índices únicos
   await runMigrations(); // índice parcial de citas
+});
+
+beforeEach(() => {
+  testStorage.reset();
+  setStorage(testStorage);
 });
 
 afterEach(async () => {

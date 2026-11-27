@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import mongoose from 'mongoose';
+import multer from 'multer';
 import { AppError } from '../utils/AppError';
 import { logger } from '../utils/logger';
 
@@ -12,6 +13,14 @@ export const notFoundHandler = (req: Request, res: Response): void => {
 export const errorHandler = (err: unknown, req: Request, res: Response, next: NextFunction): void => {
   if (err instanceof AppError) {
     res.status(err.status).json(err.details ? { message: err.message, errors: err.details } : { message: err.message });
+    return;
+  }
+  if (err instanceof multer.MulterError) {
+    if (err.code === 'LIMIT_FILE_SIZE') {
+      res.status(413).json({ message: 'El archivo supera el tamaño máximo de 5 MB' });
+      return;
+    }
+    res.status(400).json({ message: 'Archivo no válido: adjunta un único archivo en el campo "file"' });
     return;
   }
   if (err instanceof mongoose.Error.CastError) {

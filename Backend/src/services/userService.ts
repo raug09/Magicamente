@@ -5,6 +5,7 @@ import Schedule from '../models/Schedule';
 import { ROLES, Role } from '../middlewares/auth';
 import { AppError } from '../utils/AppError';
 import { deleteAllSessions, hashPassword } from './authService';
+import { deleteAllDocumentsOf } from './verificationDocumentService';
 import { sendEmail } from './emailService';
 import { updateAvailabilitySchedule } from './scheduleService';
 import { assertValidPassword } from '../utils/password';
@@ -125,6 +126,7 @@ export const deleteUserService = async (id: string): Promise<IUser | null> => {
  );
 
   await deleteAllSessions(user._id);
+  await deleteAllDocumentsOf(user._id); // los documentos de identidad no se conservan
 
   // 2. Citas pendientes
   const pending = await Appointment.find({

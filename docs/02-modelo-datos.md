@@ -120,3 +120,18 @@ Una sesión por cada login. El JWT lleva su `jti`; si la sesión no existe, el t
 | `verificationMessage` | Motivo del rechazo, visible para el psicólogo |
 | `verificationDocuments` | Lista de `{ key, status, note }`: `key` ∈ `tarjeta_profesional`, `cedula`, `diploma`; `status` ∈ `pendiente`, `ok`, `rechazado` |
 
+### Archivos de los documentos
+
+Cada elemento de `verificationDocuments` puede traer `file: { storageKey, contentType, size, uploadedAt }`. `storageKey` es **interno** (la clave en el bucket) y no se envía al cliente; el cliente solo ve `contentType`, `size` y `uploadedAt`. `verificationUpdatedAt` guarda cuándo cambió por última vez el estado de verificación (cuenta los 30 días de retención de los rechazados).
+
+## `DocumentAccessLog` (`models/DocumentAccessLog.ts`)
+
+Registro de accesos a documentos de verificación.
+
+| Campo | Notas |
+|---|---|
+| `ownerId` | Psicólogo dueño del documento (indexado) |
+| `documentKey` | `tarjeta_profesional`, `cedula` o `diploma` |
+| `accessedBy` / `accessedByRole` | Quién lo abrió: el propio psicólogo o un administrador |
+| `accessedAt` | Cuándo |
+

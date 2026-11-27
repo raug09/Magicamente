@@ -127,7 +127,20 @@ describe('verificación de psicólogos', () => {
     request(app).put(`/api/users/${id}/verification`).set(auth(admin)).send(body);
   const pendingPsychologist = async () => {
     const psychologist = await createUser('psicologo');
-    await User.updateOne({ _id: psychologist.id }, { approved: false, verificationStatus: 'pendiente' });
+    await User.updateOne(
+      { _id: psychologist.id },
+      {
+        approved: false,
+        verificationStatus: 'pendiente',
+        // Ya subió los tres documentos (aprobar exige que existan los archivos).
+        verificationDocuments: ['tarjeta_profesional', 'cedula', 'diploma'].map((key) => ({
+          key,
+          status: 'pendiente',
+          note: '',
+          file: { storageKey: `verification/${psychologist.id}/${key}/seed.pdf`, contentType: 'application/pdf', size: 10, uploadedAt: new Date() },
+        })),
+      }
+    );
     return psychologist;
   };
   const sentTo = (template: string, email: string) =>
@@ -205,6 +218,18 @@ describe('verificación de psicólogos', () => {
     const created = await request(app).post('/api/schedule').set(auth(psychologist)).send({ day: futureDay(10), hour: '10:00' });
     expect(created.status).toBe(201);
     await vi.waitFor(() => expect(sentTo('verificationApproved', psychologist.email)).toHaveLength(1));
+  });
+
+  it('aprobar exige que el psicólogo haya subido los tres documentos (400 indicando cuáles faltan)', async () => {
+    const admin = await createUser('administrador');
+    const psychologist = await createUser('psicologo');
+    await User.updateOne({ _id: psychologist.id }, { approved: false, verificationStatus: 'pendiente' }); // sin archivos
+
+    const res = await verify(admin, psychologist.id, { status: 'aprobado', documents: ALL_OK });
+    expect(res.status).toBe(400);
+    expect(res.body.message).toMatch(/subido todos los documentos/);
+    expect(res.body.message).toMatch(/Cédula de ciudadanía/);
+    expect((await User.findById(psychologist.id))?.approved).toBe(false);
   });
 
   it('rechazar exige un mensaje', async () => {

@@ -170,3 +170,9 @@ export const verificationSchema = z.object({
   documents: z.array(documentReviewInput).max(10, 'documents admite como máximo 10 elementos').optional(),
 });
 
+/** `:key` de un documento de verificación; para la ruta de administrador también `:id`. */
+export const documentKeyParams = z.object({
+  key: z.enum(PSYCHOLOGIST_DOCUMENT_KEYS, { errorMap: () => ({ message: 'El documento no es válido' }) }),
+  id: z.string().optional(),
+});
+

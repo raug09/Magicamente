@@ -23,6 +23,24 @@ export interface VerificationInput {
 }
 
 /** Mensaje visible en la respuesta según el estado (lo ve el psicólogo en su perfil). */
+/** La revisión de documentos de un psicólogo, con su archivo si ya lo subió. Si no hay ninguna, la inicial. */
+export const reviewsOf = (user: { verificationDocuments?: Array<{ key?: string; status?: string; note?: string; file?: { storageKey?: string | null; contentType?: string | null; size?: number | null; uploadedAt?: Date | null } | null }> }): DocumentReview[] =>
+  user.verificationDocuments?.length
+    ? user.verificationDocuments.map((r) => ({
+        key: r.key as DocumentKey,
+        status: r.status as DocumentReviewStatus,
+        note: r.note,
+        ...(r.file?.storageKey && {
+          file: {
+            storageKey: r.file.storageKey,
+            contentType: r.file.contentType ?? 'application/octet-stream',
+            size: r.file.size ?? 0,
+            uploadedAt: r.file.uploadedAt ?? new Date(0),
+          },
+        }),
+      }))
+    : initialDocumentReviews();
+
 export const statusMessage = (status?: VerificationStatus): string | undefined => {
   if (status === 'rechazado') return 'Tu solicitud fue rechazada. Revisa el motivo y los documentos señalados.';
   if (status === 'pendiente') return 'Tu cuenta está pendiente de aprobación.';
@@ -47,9 +65,7 @@ export const setVerificationService = async (userId: string, input: Verification
   if (!user) throw new AppError(404, 'Usuario no encontrado');
   if (user.role !== 'psicologo') throw new AppError(400, 'Solo se verifica a los psicólogos');
 
-  const reviews: DocumentReview[] = user.verificationDocuments?.length
-    ? user.verificationDocuments.map((r) => ({ key: r.key as DocumentKey, status: r.status as DocumentReviewStatus, note: r.note }))
-    : initialDocumentReviews();
+  const reviews = reviewsOf(user);
 
   for (const update of input.documents ?? []) {
     const review = reviews.find((r) => r.key === update.key);
@@ -64,6 +80,10 @@ export const setVerificationService = async (userId: string, input: Verification
     throw new AppError(400, 'Para rechazar una solicitud escribe un mensaje para el psicólogo');
   }
   if (input.status === 'aprobado') {
+    const withoutFile = reviews.filter((r) => !r.file).map((r) => DOCUMENT_LABELS[r.key]);
+    if (withoutFile.length > 0) {
+      throw new AppError(400, `Para aprobar, el psicólogo debe haber subido todos los documentos. Falta subir: ${withoutFile.join(', ')}`);
+    }
     const pending = reviews.filter((r) => r.status !== 'ok').map((r) => DOCUMENT_LABELS[r.key]);
     if (pending.length > 0) {
       throw new AppError(400, `Para aprobar, todos los documentos deben estar correctos. Falta: ${pending.join(', ')}`);
@@ -77,6 +97,7 @@ export const setVerificationService = async (userId: string, input: Verification
       // Mongoose ignora los `undefined`: para borrar el motivo hay que usar $unset.
       $set: {
         verificationStatus: input.status,
+        verificationUpdatedAt: new Date(), // cuenta los 30 días de retención de los documentos rechazados
         verificationDocuments: reviews,
         approved: input.status === 'aprobado', // derivado: lo usan las consultas que filtran psicólogos aprobados
         ...(input.status === 'rechazado' && { verificationMessage: message }),

@@ -4,6 +4,7 @@ import User from '../models/User';
 import { sendEmail } from '../services/emailService';
 import { formatAppointmentDate } from '../utils/dates';
 import { logger } from '../utils/logger';
+import { cleanupRejectedDocuments } from '../services/verificationDocumentService';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -48,9 +49,10 @@ export const sendAppointmentReminders = async (now = new Date()): Promise<number
   return sent;
 };
 
-/** Programa los recordatorios: al minuto 0 de cada hora. */
+/** Programa las tareas periódicas. Devuelve un objeto para pararlas al apagar el servidor. */
 export const startCronJobs = () => {
-  return cron.schedule('0 * * * *', async () => {
+  // Recordatorios de citas: al minuto 0 de cada hora.
+  const reminders = cron.schedule('0 * * * *', async () => {
     try {
       const sent = await sendAppointmentReminders();
       if (sent > 0) logger.info(`Recordatorios: ${sent} enviado(s)`);
@@ -58,4 +60,21 @@ export const startCronJobs = () => {
       logger.error({ err: error }, 'Recordatorios: error al ejecutar el cron');
     }
   });
+
+  // Documentos de solicitudes rechazadas hace más de 30 días: cada noche a las 03:00.
+  const cleanup = cron.schedule('0 3 * * *', async () => {
+    try {
+      const cleaned = await cleanupRejectedDocuments();
+      if (cleaned > 0) logger.info(`Documentos: se limpiaron las solicitudes rechazadas de ${cleaned} psicólogo(s)`);
+    } catch (error) {
+      logger.error({ err: error }, 'Documentos: error al limpiar los rechazados');
+    }
+  });
+
+  return {
+    stop: () => {
+      reminders.stop();
+      cleanup.stop();
+    },
+  };
 };

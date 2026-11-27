@@ -168,6 +168,61 @@ Campos permitidos:
 - `password` debe cumplir la política (8 caracteres–72 bytes) y se guarda hasheada. **Cambiarla cierra las sesiones abiertas, también la actual**: hay que volver a iniciar sesión.
 - Devuelve el usuario actualizado (sin `password`), o `404`.
 
+### `PUT /api/users/:id/verification` 🔒 solo administrador
+
+Decide el estado de un psicólogo y revisa sus documentos. **La aprobación ya no se edita con `PUT /users/:id`**: solo se hace aquí.
+
+```json
+{
+  "status": "rechazado",
+  "message": "La tarjeta profesional no se lee bien. Sube una foto nítida.",
+  "documents": [
+    { "key": "tarjeta_profesional", "status": "rechazado", "note": "Imagen borrosa" },
+    { "key": "cedula", "status": "ok" }
+  ]
+}
+```
+
+- `status`: `pendiente`, `rechazado` o `aprobado`.
+- `documents` (opcional): revisión de cada documento. `key` es uno de `tarjeta_profesional`, `cedula` o `diploma`; `status` es `ok` o `rechazado`; `note` (opcional, máx. 500) explica el problema. Los que no vienen se mantienen.
+- **Aprobar** exige que el psicólogo haya **subido los tres archivos** y que los tres estén en `ok`; si no, `400` indicando cuáles faltan.
+- **Rechazar** exige `message` (no vacío, máx. 1000). Los documentos marcados como `rechazado` se resaltan en el correo.
+- **Pendiente** vuelve a la revisión y borra el mensaje de rechazo.
+- Solo se envía correo cuando el estado cambia a `aprobado` o a `rechazado`.
+- `400` si el usuario no es psicólogo; `404` si no existe.
+- Respuesta: el usuario actualizado (`verificationStatus`, `verificationMessage`, `verificationDocuments`, `approved`).
+
+El psicólogo ve su estado, el mensaje y sus documentos en `GET /api/auth/me`.
+
+### Documentos de verificación
+
+Los documentos se guardan en un **almacenamiento privado** (Cloudflare R2). Nunca hay enlaces públicos: para abrir uno se pide un enlace temporal.
+
+| Método | Ruta | Quién | Qué hace |
+|---|---|---|---|
+| PUT | `/api/verification/documents/:key` | 🔒 psicólogo | Sube o reemplaza un documento (multipart) |
+| GET | `/api/verification/documents/:key/url` | 🔒 psicólogo | Enlace temporal a **su** documento |
+| GET | `/api/users/:id/verification/documents/:key/url` | 🔒 administrador | Enlace temporal al documento de un psicólogo |
+
+`:key` es `tarjeta_profesional`, `cedula` o `diploma` (otro valor → `400`).
+
+**`PUT /api/verification/documents/:key`** — `multipart/form-data` con el archivo en el campo **`file`**:
+
+```bash
+curl -X PUT $API/api/verification/documents/cedula -H "Authorization: Bearer $TOKEN" -F "file=@cedula.pdf"
+```
+
+- Formatos: **PDF, JPG o PNG**, máximo **5 MB**, un solo archivo. El tipo se comprueba por el **contenido** del archivo, no por su extensión ni por el tipo que declare el navegador.
+- `200 { "message", "verificationStatus", "verificationDocuments": [...] }`. El documento queda `pendiente` de revisión; cada archivo muestra `file: { contentType, size, uploadedAt }` (la clave interna del almacenamiento nunca sale del servidor).
+- Subir un documento que ya existía lo **reemplaza** y borra el anterior.
+- Si la solicitud estaba `rechazada`, corregir un documento la devuelve a `pendiente` y borra el motivo.
+- `400` formato no válido, sin archivo o `key` inválida · `403` si no eres psicólogo · `409` si la cuenta ya está **aprobada** (para cambiar un documento hay que contactar al equipo) · `413` si supera 5 MB · `503` si el almacenamiento no está configurado.
+- Límite: 30 peticiones por hora y IP.
+
+**`GET …/url`** — `200 { "url", "expiresInSeconds": 300, "contentType" }`. El enlace caduca a los **5 minutos**. `404` si ese documento no se ha subido. Un psicólogo solo puede abrir los suyos; un administrador, los de cualquiera. **Cada apertura queda registrada** (quién, qué documento y cuándo).
+
+**Retención:** los documentos de una solicitud que sigue `rechazada` se borran del almacenamiento a los **30 días** sin corregirla (el psicólogo tendrá que subirlos de nuevo). Los documentos de una cuenta eliminada se borran al eliminarla, y una tarea nocturna completa ese borrado si falló en ese momento.
+
 ### `DELETE /api/users/:id` 🔒 uno mismo o admin
 `200 { "message": "Usuario eliminado correctamente" }` · `404` si no existe o ya estaba eliminado · `409` si es el último administrador.
 

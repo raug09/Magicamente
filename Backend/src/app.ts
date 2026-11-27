@@ -8,6 +8,7 @@ import userRoutes from './routes/user';
 import appointmentRoutes from './routes/appointment';
 import scheduleRoutes from './routes/schedule';
 import psychologistRoutes from './routes/psychologist';
+import verificationRoutes from './routes/verification';
 import { errorHandler, notFoundHandler } from './middlewares/errorHandler';
 import { createRateLimiters } from './middlewares/rateLimiters';
 import { getCorsOrigins, getTrustProxy } from './config/env';
@@ -51,6 +52,7 @@ export const createApp = ({ rateLimit = true }: AppOptions = {}) => {
     app.use('/api/auth/reset-password', limiters.sensitive);
     app.use('/api/auth/resend-verification', limiters.sensitive);
     app.use('/api/auth/change-email', limiters.sensitive);
+    app.use('/api/verification', limiters.uploads);
   }
 
   app.get('/', (req, res) => {
@@ -68,6 +70,7 @@ export const createApp = ({ rateLimit = true }: AppOptions = {}) => {
   app.use('/api/appointments', appointmentRoutes);
   app.use('/api/schedule', scheduleRoutes);
   app.use('/api/psychologists', psychologistRoutes);
+  app.use('/api/verification', verificationRoutes);
 
   app.use(notFoundHandler);
   app.use(errorHandler);
