@@ -234,7 +234,7 @@ Ya se pueden crear franjas para **hoy** (en el calendario del psicólogo) siempr
 1. Formulario en el perfil: nuevo email y contraseña actual → `POST /api/auth/change-email { email, password }` (requiere sesión).
 2. Mensaje: “Te hemos enviado un enlace a la nueva dirección”. El email **todavía no ha cambiado**.
 3. El usuario abre el enlace del correo (`/confirm-email-change?token=…`) → `POST /api/auth/confirm-email-change { token }`.
-4. Tras confirmar, pide iniciar sesión de nuevo con el email nuevo (el token actual sigue siendo válido, pero conviene refrescar la pantalla de perfil).
+4. Tras confirmar, la sesión actual sigue abierta; basta con refrescar la pantalla de perfil.
 
 Errores: `400 “La contraseña no es correcta”` (muestra el error en el formulario; **no** cierres la sesión: es un 400, no un 401), `409 “Ese email ya está en uso”`.
 

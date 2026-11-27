@@ -9,6 +9,10 @@ import {
   resendVerification,
   requestEmailChange,
   confirmEmailChange,
+  logout,
+  logoutAll,
+  listSessions,
+  revokeSession,
 } from '../controllers/authController';
 import { asyncHandler } from '../middlewares/asyncHandler';
 import { isAuthenticated } from '../middlewares/auth';
@@ -45,5 +49,11 @@ router.post('/resend-verification', validate({ body: resendVerificationSchema })
 // Cambio de email: pedirlo (con sesión y contraseña) y confirmarlo desde el nuevo correo.
 router.post('/change-email', isAuthenticated, validate({ body: requestEmailChangeSchema }), asyncHandler(requestEmailChange));
 router.post('/confirm-email-change', validate({ body: confirmEmailChangeSchema }), asyncHandler(confirmEmailChange));
+
+// Sesiones: cerrar la actual, cerrar todas, listar y cerrar una concreta.
+router.post('/logout', isAuthenticated, asyncHandler(logout));
+router.post('/logout-all', isAuthenticated, asyncHandler(logoutAll));
+router.get('/sessions', isAuthenticated, asyncHandler(listSessions));
+router.delete('/sessions/:id', isAuthenticated, asyncHandler(revokeSession));
 
 export default router;

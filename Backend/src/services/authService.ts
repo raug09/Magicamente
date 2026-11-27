@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import User, { IUser } from '../models/User';
+import Session from '../models/Session';
 import { sendEmail } from './emailService';
 import { getFrontendUrl, getJwtSecret } from '../config/env';
 import { AppError } from '../utils/AppError';
@@ -13,9 +14,17 @@ import { logger } from '../utils/logger';
 /** Roles que se pueden elegir en el registro público. Los administradores se crean aparte. */
 export const SELF_REGISTER_ROLES: Role[] = ['paciente', 'psicologo'];
 
-/** JWT de sesión: caduca en 1 hora. El rol real se vuelve a leer de la BD en cada petición. */
-export const signToken = (user: Pick<IUser, '_id' | 'role'>): string =>
-  jwt.sign({ id: user._id, role: user.role }, getJwtSecret(), { expiresIn: '1h' });
+/** Duración de una sesión: igual que la del token. */
+export const SESSION_TTL_MS = 60 * 60 * 1000;
+
+/** JWT de sesión: caduca en 1 hora y lleva el `jti` de su sesión. El token solo vale si la sesión existe. */
+export const signToken = (user: Pick<IUser, '_id' | 'role'>, jti: string): string =>
+  jwt.sign({ id: user._id, role: user.role, jti }, getJwtSecret(), { expiresIn: '1h' });
+
+/** Borra todas las sesiones de un usuario (cambio o restablecimiento de contraseña, borrado de cuenta, logout-all). */
+export const deleteAllSessions = async (userId: unknown): Promise<void> => {
+  await Session.deleteMany({ userId });
+};
 
 export const hashPassword = async (password: string): Promise<string> => {
   const salt = await bcrypt.genSalt(10);
@@ -126,7 +135,33 @@ export const loginService = async (email: string, password: string): Promise<str
     throw new AppError(403, 'Debes confirmar tu email antes de iniciar sesión. Revisa tu correo.');
   }
 
-  return signToken(user);
+  const jti = crypto.randomUUID();
+  await Session.create({ userId: user._id, jti, expiresAt: new Date(Date.now() + SESSION_TTL_MS) });
+  return signToken(user, jti);
+};
+
+/** Cierra la sesión en la que se hizo la petición. */
+export const logoutService = async (jti: string): Promise<void> => {
+  await Session.deleteOne({ jti });
+};
+
+/** Lista las sesiones abiertas del usuario. No expone el `jti`: solo un identificador de la sesión. */
+export const listSessionsService = async (userId: string, currentJti?: string) => {
+  const sessions = await Session.find({ userId, expiresAt: { $gt: new Date() } }).sort({ createdAt: -1 });
+  return sessions.map((session) => ({
+    _id: session._id,
+    createdAt: session.createdAt,
+    expiresAt: session.expiresAt,
+    current: session.jti === currentJti,
+  }));
+};
+
+/** Cierra una sesión concreta del propio usuario. 404 si no existe o es de otro usuario. */
+export const revokeSessionService = async (userId: string, sessionId: string): Promise<void> => {
+  const deleted = await Session.findOneAndDelete({ _id: sessionId, userId });
+  if (!deleted) {
+    throw new AppError(404, 'La sesión no existe');
+  }
 };
 
 // --- Recuperación de contraseña -------------------------------------------------------------
@@ -176,6 +211,7 @@ export const resetPasswordService = async (token: string, newPassword: string): 
   if (!user) {
     throw new AppError(400, 'El enlace no es válido o ha caducado');
   }
+  await deleteAllSessions(user._id);
 };
 
 // --- Cambio de email -------------------------------------------------------------------------

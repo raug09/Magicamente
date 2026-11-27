@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { getJwtSecret } from '../config/env';
 import User from '../models/User';
+import Session from '../models/Session';
 
 export const ROLES = ['paciente', 'psicologo', 'administrador'] as const;
 export type Role = (typeof ROLES)[number];
@@ -9,6 +10,8 @@ export type Role = (typeof ROLES)[number];
 export interface AuthUser {
   id: string;
   role: Role;
+  /** Identificador de la sesión en la que se hizo la petición (para cerrarla). */
+  jti?: string;
 }
 
 // Añade `req.user` al tipo Request de Express.
@@ -57,6 +60,14 @@ export const isAuthenticated = async (req: Request, res: Response, next: NextFun
       return;
     }
 
+    // La sesión debe existir: un logout, un cambio de contraseña o un borrado la eliminan.
+    const jti = typeof decoded.jti === 'string' ? decoded.jti : undefined;
+    const session = jti ? await Session.exists({ jti, userId: decoded.id }) : null;
+    if (!session) {
+      res.status(401).json({ message: 'La sesión no es válida: vuelve a iniciar sesión' });
+      return;
+    }
+
     const user = await User.findById(decoded.id).select('role isActive +passwordChangedAt');
     if (!user || user.isActive === false) {
       res.status(401).json({ message: 'La cuenta no existe o está desactivada' });
@@ -70,7 +81,7 @@ export const isAuthenticated = async (req: Request, res: Response, next: NextFun
       return;
     }
 
-    req.user = { id: String(user._id), role: user.role };
+    req.user = { id: String(user._id), role: user.role, jti };
     next();
   } catch (error) {
     next(error);

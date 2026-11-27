@@ -3,15 +3,19 @@ import jwt from 'jsonwebtoken';
 import request from 'supertest';
 import User from '../src/models/User';
 import { createApp } from '../src/app';
-import { app, auth, createUser, TestUser } from './helpers';
+import { app, auth, createUser, sessionToken, TestUser } from './helpers';
 
 vi.mock('../src/services/emailService', () => ({ sendEmail: vi.fn().mockResolvedValue({ id: 'test' }) }));
 
 import { sendEmail } from '../src/services/emailService';
 
 /** Token ya emitido hace un minuto (como el de una sesión abierta antes de cambiar la contraseña). */
-const oldToken = (user: TestUser, role = 'paciente') =>
-  jwt.sign({ id: user.id, role, iat: Math.floor(Date.now() / 1000) - 60 }, process.env.JWT_SECRET!, { expiresIn: '1h' });
+const oldToken = async (user: TestUser, role = 'paciente'): Promise<string> => {
+  // Sesión creada, pero el token lleva una fecha de emisión de hace un minuto.
+  const token = await sessionToken(user.id, role as 'paciente');
+  const payload = jwt.decode(token) as { jti: string };
+  return jwt.sign({ id: user.id, role, jti: payload.jti, iat: Math.floor(Date.now() / 1000) - 60 }, process.env.JWT_SECRET!, { expiresIn: '1h' });
+};
 const bearer = (token: string) => ({ Authorization: `Bearer ${token}` });
 const me = (token: string) => request(app).get('/api/appointments/appointment').set(bearer(token)); // 200 para pacientes
 
@@ -45,13 +49,14 @@ describe('sesiones: el token se valida contra la base de datos', () => {
 
     // y al revés: un token de paciente no sirve para hacerse administrador
     const patient = await createUser('paciente');
+    // Un token firmado a mano no tiene sesión en la BD: se rechaza antes de mirar el rol.
     const forged = jwt.sign({ id: patient.id, role: 'administrador' }, process.env.JWT_SECRET!);
-    expect((await request(app).get('/api/users').set(bearer(forged))).status).toBe(403);
+    expect((await request(app).get('/api/users').set(bearer(forged))).status).toBe(401);
   });
 
   it('al cambiar la contraseña por PUT /users/:id, las sesiones anteriores caducan', async () => {
     const user = await createUser('paciente');
-    const before = oldToken(user);
+    const before = await oldToken(user);
     expect((await me(before)).status).toBe(200);
 
     const change = await request(app).put(`/api/users/${user.id}`).set(auth(user)).send({ password: 'clave-nueva-123' });
@@ -65,7 +70,7 @@ describe('sesiones: el token se valida contra la base de datos', () => {
 
   it('al restablecer la contraseña con el enlace, las sesiones anteriores caducan', async () => {
     const user = await createUser('paciente');
-    const before = oldToken(user);
+    const before = await oldToken(user);
 
     await request(app).post('/api/auth/forgot-password').send({ email: user.email });
     await vi.waitFor(() => expect(sendEmail).toHaveBeenCalled());

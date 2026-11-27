@@ -68,6 +68,10 @@ Pendiente de probar de extremo a extremo: los correos reales (hace falta `RESEND
 
 - Cambio de email con contraseña actual, enlace al nuevo correo (24 h, un solo uso), aviso al actual y comprobación de duplicados al confirmar.
 
+## ✅ Hecho: cierre de sesión real
+
+- Sesiones en el servidor: logout, logout-all, lista de sesiones y cierre de una concreta. Se cierran al cambiar o restablecer la contraseña y al borrar la cuenta.
+
 ## Pendientes de producto
 
 - [ ] **Pago de las citas.** No existe ningún cobro. Hay que decidir: ¿quién cobra (la plataforma o el psicólogo)?, ¿cuándo (al reservar o antes de la cita)?, ¿qué pasa con cancelaciones y reembolsos?, ¿qué pasarela (Stripe, MercadoPago, Wompi u otra) y en qué países?, ¿comisión de la plataforma?

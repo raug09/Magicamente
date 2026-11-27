@@ -18,6 +18,10 @@ Leyenda: ✅ funciona · ⚠️ funciona con salvedades · ❌ roto (detalles en
 | POST | `/api/auth/verify-email` | todos | Confirma el email con el enlace del correo | ✅ |
 | POST | `/api/auth/resend-verification` | todos | Pide un nuevo enlace de confirmación | ✅ |
 | POST | `/api/auth/change-email` | 🔒 | Pide cambiar el email (con contraseña actual) | ✅ |
+| POST | `/api/auth/logout` | 🔒 | Cierra la sesión actual | ✅ |
+| POST | `/api/auth/logout-all` | 🔒 | Cierra todas las sesiones del usuario | ✅ |
+| GET | `/api/auth/sessions` | 🔒 | Lista las sesiones abiertas (marca la actual) | ✅ |
+| DELETE | `/api/auth/sessions/:id` | 🔒 | Cierra una sesión concreta | ✅ |
 | POST | `/api/auth/confirm-email-change` | todos | Aplica el cambio de email con el enlace del nuevo correo | ✅ |
 | POST | `/api/auth/forgot-password` | todos | Pide un enlace para restablecer la contraseña | ✅ |
 | POST | `/api/auth/reset-password` | todos | Cambia la contraseña con el token del enlace | ✅ |
@@ -87,6 +91,19 @@ Los antiguos `POST /api/email/send-test` y `GET /api/notifications/test` se **el
 - `200 { "message": "Correo actualizado…" }`. El enlace caduca en **24 horas** y solo se puede usar una vez.
 - `400` si el enlace no es válido o caducó. `409` si, mientras tanto, otra cuenta ha tomado ese email.
 - Tras confirmar, el nuevo email sirve para iniciar sesión y el antiguo ya no.
+
+### Cierre de sesión y sesiones abiertas
+
+Cada login crea una **sesión** en el servidor, y el token apunta a ella. El token solo vale mientras su sesión exista:
+
+- `POST /api/auth/logout` → `200`. Cierra la sesión actual. A partir de ahí, ese token responde `401`.
+- `POST /api/auth/logout-all` → `200`. Cierra todas las sesiones del usuario, incluida la que lo pide.
+- `GET /api/auth/sessions` → `[{ "_id", "createdAt", "expiresAt", "current": true|false }]`. Para pantallas tipo “dispositivos conectados”. No expone el token ni identificadores internos de la sesión.
+- `DELETE /api/auth/sessions/:id` → `200`. Cierra una sesión concreta del propio usuario. `404` si no existe o es de otro usuario.
+
+Se cierran **todas** las sesiones al cambiar o restablecer la contraseña y al borrar la cuenta. Las sesiones caducan a la vez que el token (1 hora) y se borran solas.
+
+Un token sin sesión (cerrada, caducada, o firmado a mano) responde `401` “La sesión no es válida: vuelve a iniciar sesión”.
 
 ### `POST /api/auth/login`
 

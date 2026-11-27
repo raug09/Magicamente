@@ -8,6 +8,10 @@ import {
   resendVerificationService,
   requestEmailChangeService,
   confirmEmailChangeService,
+  logoutService,
+  deleteAllSessions,
+  listSessionsService,
+  revokeSessionService,
 } from '../services/authService';
 import { getUserService } from '../services/userService';
 import { AppError } from '../utils/AppError';
@@ -68,4 +72,24 @@ export const requestEmailChange = async (req: Request, res: Response) => {
 export const confirmEmailChange = async (req: Request, res: Response) => {
   await confirmEmailChangeService(req.body.token);
   res.status(200).json({ message: 'Correo actualizado. Úsalo la próxima vez que inicies sesión.' });
+};
+
+export const logout = async (req: Request, res: Response) => {
+  await logoutService(req.user!.jti!);
+  res.status(200).json({ message: 'Sesión cerrada' });
+};
+
+/** Cierra todas las sesiones del usuario, también la actual. */
+export const logoutAll = async (req: Request, res: Response) => {
+  await deleteAllSessions(req.user!.id);
+  res.status(200).json({ message: 'Todas las sesiones se han cerrado' });
+};
+
+export const listSessions = async (req: Request, res: Response) => {
+  res.status(200).json(await listSessionsService(req.user!.id, req.user!.jti));
+};
+
+export const revokeSession = async (req: Request, res: Response) => {
+  await revokeSessionService(req.user!.id, req.params.id);
+  res.status(200).json({ message: 'Sesión cerrada' });
 };

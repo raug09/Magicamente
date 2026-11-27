@@ -99,3 +99,15 @@ Los índices de `Appointment` los sincroniza `config/migrations.ts` al arrancar 
 - Cambiar la `timezone` de un psicólogo **no mueve** las franjas ya creadas (su `startsAt` sigue siendo el mismo instante real). Al editarlas, se interpretan en la zona nueva.
 - Los correos usan la zona del destinatario. `APP_TIMEZONE` es solo la zona por defecto de las cuentas nuevas.
 - **Migración al arrancar** (`config/migrations.ts`): usuarios sin zona → `APP_TIMEZONE`; franjas antiguas → `startsAt` = día + hora en UTC (así se interpretaban hasta ahora) y `timezone: 'UTC'`.
+
+## `Session` (`models/Session.ts`)
+
+Una sesión por cada login. El JWT lleva su `jti`; si la sesión no existe, el token no vale.
+
+| Campo | Tipo | Notas |
+|---|---|---|
+| `userId` | ObjectId → User | Indexado |
+| `jti` | String | Único. Identificador que viaja dentro del token |
+| `createdAt` | Date | |
+| `expiresAt` | Date | Igual que la caducidad del token (1 h). Índice TTL: MongoDB borra las caducadas |
+

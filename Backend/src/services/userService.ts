@@ -4,7 +4,7 @@ import Appointment from '../models/appointment';
 import Schedule from '../models/Schedule';
 import { ROLES, Role } from '../middlewares/auth';
 import { AppError } from '../utils/AppError';
-import { hashPassword } from './authService';
+import { deleteAllSessions, hashPassword } from './authService';
 import { sendEmail } from './emailService';
 import { updateAvailabilitySchedule } from './scheduleService';
 import { assertValidPassword } from '../utils/password';
@@ -68,7 +68,11 @@ export const updateUserService = async (
     throw new AppError(400, `role debe ser uno de: ${ROLES.join(', ')}`);
   }
 
-  return User.findOneAndUpdate({ _id: id, ...NOT_DELETED }, update, { new: true, runValidators: true }).select('-password');
+  const updated = await User.findOneAndUpdate({ _id: id, ...NOT_DELETED }, update, { new: true, runValidators: true }).select('-password');
+  if (updated && 'password' in update) {
+    await deleteAllSessions(updated._id); // cambiar la contraseña cierra todas las sesiones
+  }
+  return updated;
 };
 
 /** Avisa (sin bloquear el borrado si falla) a la otra persona de una cita cancelada por el borrado de una cuenta. */
@@ -126,6 +130,8 @@ export const deleteUserService = async (id: string): Promise<IUser | null> => {
       $unset: { description: '', passwordResetTokenHash: '', passwordResetExpires: '' },
     }
  );
+
+  await deleteAllSessions(user._id);
 
   // 2. Citas pendientes
   const pending = await Appointment.find({
