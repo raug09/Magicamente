@@ -229,6 +229,15 @@ POST /api/schedule  { "day": "2026-12-15", "hour": "10:00", "repeatWeeks": 8 }
 
 Ya se pueden crear franjas para **hoy** (en el calendario del psicólogo) siempre que su hora no haya empezado. Una franja ya empezada nunca se puede reservar: `GET /schedule/:id?available=true` ya la excluye.
 
+### Cambiar el email
+
+1. Formulario en el perfil: nuevo email y contraseña actual → `POST /api/auth/change-email { email, password }` (requiere sesión).
+2. Mensaje: “Te hemos enviado un enlace a la nueva dirección”. El email **todavía no ha cambiado**.
+3. El usuario abre el enlace del correo (`/confirm-email-change?token=…`) → `POST /api/auth/confirm-email-change { token }`.
+4. Tras confirmar, pide iniciar sesión de nuevo con el email nuevo (el token actual sigue siendo válido, pero conviene refrescar la pantalla de perfil).
+
+Errores: `400 “La contraseña no es correcta”` (muestra el error en el formulario; **no** cierres la sesión: es un 400, no un 401), `409 “Ese email ya está en uso”`.
+
 ### Rutas a las que apuntan los correos
 
 Los botones de los correos llevan a estas rutas de `FRONTEND_URL`. El frontend debe crearlas con estos nombres:
@@ -239,6 +248,7 @@ Los botones de los correos llevan a estas rutas de `FRONTEND_URL`. El frontend d
 | `/reset-password?token=…` | Recuperación de contraseña | Formulario de nueva contraseña |
 | `/citas` | Recordatorio de cita | Mis citas |
 | `/psicologos` | Aviso de cita cancelada | Listado de psicólogos |
+| `/confirm-email-change?token=…` | Confirmación de nuevo email | Llama a `POST /auth/confirm-email-change` |
 
 Las dos últimas son nombres elegidos por el backend; si el frontend usa otras rutas, dilo y se cambian en `config/emailTemplates.ts`.
 

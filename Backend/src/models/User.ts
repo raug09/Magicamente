@@ -28,6 +28,11 @@ export interface IUser extends Document {
   emailVerificationSentAt?: Date;
   /** Los psicólogos empiezan sin aprobar: un administrador los aprueba. Los demás roles siempre están aprobados. */
   approved?: boolean;
+  /** Cambio de email pendiente de confirmar (se aplica al confirmar el enlace enviado al nuevo email). */
+  pendingEmail?: string;
+  emailChangeTokenHash?: string;
+  emailChangeExpires?: Date;
+  emailChangeSentAt?: Date;
 }
 
 const UserSchema = new Schema<IUser>({
@@ -53,6 +58,10 @@ const UserSchema = new Schema<IUser>({
   emailVerificationTokenHash: { type: String, select: false },
   emailVerificationExpires: { type: Date, select: false },
   emailVerificationSentAt: { type: Date, select: false },
+  pendingEmail: { type: String, select: false },
+  emailChangeTokenHash: { type: String, select: false },
+  emailChangeExpires: { type: Date, select: false },
+  emailChangeSentAt: { type: Date, select: false },
   approved: {
     type: Boolean,
     default: function (this: { role?: string }) {

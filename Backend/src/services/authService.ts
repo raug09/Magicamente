@@ -177,3 +177,79 @@ export const resetPasswordService = async (token: string, newPassword: string): 
     throw new AppError(400, 'El enlace no es válido o ha caducado');
   }
 };
+
+// --- Cambio de email -------------------------------------------------------------------------
+
+export const EMAIL_CHANGE_TTL_MS = 24 * 60 * 60 * 1000; // el enlace caduca en 24 horas
+export const EMAIL_CHANGE_COOLDOWN_MS = 60 * 1000; // como mucho una solicitud por minuto
+
+/**
+ * Pide cambiar el email. Exige la contraseña actual (si alguien tiene la sesión abierta no basta para
+ * apoderarse de la cuenta). Envía el enlace al NUEVO email y avisa al email ACTUAL.
+ * Si se pidió hace menos de un minuto, no hace nada: la respuesta es igual.
+ */
+export const requestEmailChangeService = async (userId: string, newEmail: string, password: string): Promise<void> => {
+  const user = await User.findById(userId).select('+password +emailChangeSentAt');
+  if (!user) throw new AppError(404, 'Usuario no encontrado');
+
+  if (!(await bcrypt.compare(password, user.password))) {
+    throw new AppError(400, 'La contraseña no es correcta');
+  }
+  if (newEmail === user.email) {
+    throw new AppError(400, 'Ese ya es tu correo');
+  }
+  if (await User.exists({ email: newEmail })) {
+    throw new AppError(409, 'Ese email ya está en uso');
+  }
+
+  const lastSentAt = user.emailChangeSentAt?.getTime() ?? 0;
+  if (Date.now() - lastSentAt < EMAIL_CHANGE_COOLDOWN_MS) return;
+
+  const token = newToken();
+  const now = new Date();
+  await User.updateOne(
+    { _id: user._id },
+    {
+      pendingEmail: newEmail,
+      emailChangeTokenHash: hashToken(token),
+      emailChangeExpires: new Date(now.getTime() + EMAIL_CHANGE_TTL_MS),
+      emailChangeSentAt: now,
+    }
+  );
+
+  const confirmLink = `${getFrontendUrl()}/confirm-email-change?token=${token}`;
+  sendEmail('confirmEmailChange', newEmail, user.name, confirmLink).catch((error) => {
+    logger.error({ err: error }, 'Error al enviar el correo de confirmación del cambio de email');
+  });
+  sendEmail('emailChangeRequested', user.email, user.name).catch((error) => {
+    logger.error({ err: error }, 'Error al avisar del cambio de email');
+  });
+};
+
+/** Aplica el cambio de email con un enlace válido. Si el email ya lo usa otra cuenta, se rechaza. */
+export const confirmEmailChangeService = async (token: string): Promise<void> => {
+  const user = await User.findOne({
+    emailChangeTokenHash: hashToken(token),
+    emailChangeExpires: { $gt: new Date() },
+    isActive: { $ne: false },
+  }).select('+pendingEmail +emailChangeTokenHash');
+  if (!user || !user.pendingEmail) {
+    throw new AppError(400, 'El enlace no es válido o ha caducado');
+  }
+
+  if (await User.exists({ email: user.pendingEmail, _id: { $ne: user._id } })) {
+    throw new AppError(409, 'Ese email ya está en uso');
+  }
+
+  // Solo se aplica si el token sigue siendo el mismo: así un enlace usado no vuelve a funcionar.
+  const updated = await User.findOneAndUpdate(
+    { _id: user._id, emailChangeTokenHash: hashToken(token) },
+    {
+      email: user.pendingEmail,
+      $unset: { pendingEmail: '', emailChangeTokenHash: '', emailChangeExpires: '', emailChangeSentAt: '' },
+    }
+  );
+  if (!updated) {
+    throw new AppError(400, 'El enlace no es válido o ha caducado');
+  }
+};

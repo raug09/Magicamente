@@ -6,6 +6,8 @@ import {
   resetPasswordService,
   verifyEmailService,
   resendVerificationService,
+  requestEmailChangeService,
+  confirmEmailChangeService,
 } from '../services/authService';
 import { getUserService } from '../services/userService';
 import { AppError } from '../utils/AppError';
@@ -55,4 +57,15 @@ export const me = async (req: Request, res: Response) => {
     throw new AppError(404, 'Usuario no encontrado');
   }
   res.status(200).json(user);
+};
+
+/** Pide el cambio de email: requiere la sesión y la contraseña actual. Responde igual en todos los casos válidos. */
+export const requestEmailChange = async (req: Request, res: Response) => {
+  await requestEmailChangeService(req.user!.id, req.body.email, req.body.password);
+  res.status(200).json({ message: 'Te hemos enviado un enlace de confirmación a la nueva dirección.' });
+};
+
+export const confirmEmailChange = async (req: Request, res: Response) => {
+  await confirmEmailChangeService(req.body.token);
+  res.status(200).json({ message: 'Correo actualizado. Úsalo la próxima vez que inicies sesión.' });
 };

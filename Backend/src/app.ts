@@ -50,6 +50,7 @@ export const createApp = ({ rateLimit = true }: AppOptions = {}) => {
     app.use('/api/auth/forgot-password', limiters.sensitive);
     app.use('/api/auth/reset-password', limiters.sensitive);
     app.use('/api/auth/resend-verification', limiters.sensitive);
+    app.use('/api/auth/change-email', limiters.sensitive);
   }
 
   app.get('/', (req, res) => {

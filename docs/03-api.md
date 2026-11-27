@@ -17,6 +17,8 @@ Leyenda: ✅ funciona · ⚠️ funciona con salvedades · ❌ roto (detalles en
 | GET | `/api/auth/me` | 🔒 | Usuario de la sesión actual | ✅ |
 | POST | `/api/auth/verify-email` | todos | Confirma el email con el enlace del correo | ✅ |
 | POST | `/api/auth/resend-verification` | todos | Pide un nuevo enlace de confirmación | ✅ |
+| POST | `/api/auth/change-email` | 🔒 | Pide cambiar el email (con contraseña actual) | ✅ |
+| POST | `/api/auth/confirm-email-change` | todos | Aplica el cambio de email con el enlace del nuevo correo | ✅ |
 | POST | `/api/auth/forgot-password` | todos | Pide un enlace para restablecer la contraseña | ✅ |
 | POST | `/api/auth/reset-password` | todos | Cambia la contraseña con el token del enlace | ✅ |
 | GET | `/api/users` | 🔒 admin | Listar usuarios | ✅ |
@@ -63,6 +65,28 @@ Los antiguos `POST /api/email/send-test` y `GET /api/notifications/test` se **el
 - Tras guardar intenta enviar el correo `confirmation`; si falla, solo lo registra en el log.
 - `201 { "message": "Usuario registrado…", "user": {…} }`. **No devuelve token**: el usuario queda con `emailVerified: false` y recibe un correo con el enlace de confirmación. Hasta confirmarlo, el login responde `403`.
 - Los psicólogos quedan con `approved: false` hasta que un administrador los aprueba (ver `PUT /api/users/:id`).
+
+### `POST /api/auth/change-email` 🔒
+
+```json
+{ "email": "nueva@example.com", "password": "contraseña-actual" }
+```
+
+- Pide cambiar el email de tu cuenta. **Exige la contraseña actual**: una sesión abierta por sí sola no basta.
+- Envía un enlace de confirmación **a la nueva dirección** y un aviso **a la actual** (sin mencionar la nueva). Hasta confirmar, el email no cambia.
+- `200 { "message": "Te hemos enviado un enlace de confirmación a la nueva dirección." }`.
+- `400` si la contraseña no es correcta, si es tu mismo email actual o si el formato no es válido. `409` si el email ya lo usa otra cuenta.
+- Como mucho una solicitud por minuto (la segunda no envía nada, pero responde igual). Límite por IP compartido con registro y recuperación.
+
+### `POST /api/auth/confirm-email-change`
+
+```json
+{ "token": "<token del enlace>" }
+```
+
+- `200 { "message": "Correo actualizado…" }`. El enlace caduca en **24 horas** y solo se puede usar una vez.
+- `400` si el enlace no es válido o caducó. `409` si, mientras tanto, otra cuenta ha tomado ese email.
+- Tras confirmar, el nuevo email sirve para iniciar sesión y el antiguo ya no.
 
 ### `POST /api/auth/login`
 

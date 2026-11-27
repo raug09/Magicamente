@@ -64,6 +64,10 @@ Las referencias (S1, F2…) apuntan a [06 · Problemas conocidos](06-problemas-c
 
 Pendiente de probar de extremo a extremo: los correos reales (hace falta `RESEND_API_KEY`).
 
+## ✅ Hecho: cambio de email
+
+- Cambio de email con contraseña actual, enlace al nuevo correo (24 h, un solo uso), aviso al actual y comprobación de duplicados al confirmar.
+
 ## Pendientes de producto
 
 - [ ] **Pago de las citas.** No existe ningún cobro. Hay que decidir: ¿quién cobra (la plataforma o el psicólogo)?, ¿cuándo (al reservar o antes de la cita)?, ¿qué pasa con cancelaciones y reembolsos?, ¿qué pasarela (Stripe, MercadoPago, Wompi u otra) y en qué países?, ¿comisión de la plataforma?

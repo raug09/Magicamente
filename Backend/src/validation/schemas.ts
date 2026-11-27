@@ -63,6 +63,10 @@ export const verifyEmailSchema = z.object({ token: text('token', 200) });
 
 export const resendVerificationSchema = z.object({ email: validEmail });
 
+export const requestEmailChangeSchema = z.object({ email: validEmail, password: passwordField });
+
+export const confirmEmailChangeSchema = z.object({ token: text('token', 200) });
+
 export const resetPasswordSchema = z.object({
   token: text('token', 200),
   password: passwordField,

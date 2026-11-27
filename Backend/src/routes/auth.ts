@@ -1,5 +1,15 @@
 import { Router } from 'express';
-import { register, login, forgotPassword, resetPassword, me, verifyEmail, resendVerification } from '../controllers/authController';
+import {
+  register,
+  login,
+  forgotPassword,
+  resetPassword,
+  me,
+  verifyEmail,
+  resendVerification,
+  requestEmailChange,
+  confirmEmailChange,
+} from '../controllers/authController';
 import { asyncHandler } from '../middlewares/asyncHandler';
 import { isAuthenticated } from '../middlewares/auth';
 import { validate } from '../validation/validate';
@@ -10,6 +20,8 @@ import {
   resetPasswordSchema,
   resendVerificationSchema,
   verifyEmailSchema,
+  requestEmailChangeSchema,
+  confirmEmailChangeSchema,
 } from '../validation/schemas';
 
 const router = Router();
@@ -29,5 +41,9 @@ router.post('/reset-password', validate({ body: resetPasswordSchema }), asyncHan
 // Verificación de email: el enlace llega al registrarse; si caduca, se pide otro.
 router.post('/verify-email', validate({ body: verifyEmailSchema }), asyncHandler(verifyEmail));
 router.post('/resend-verification', validate({ body: resendVerificationSchema }), asyncHandler(resendVerification));
+
+// Cambio de email: pedirlo (con sesión y contraseña) y confirmarlo desde el nuevo correo.
+router.post('/change-email', isAuthenticated, validate({ body: requestEmailChangeSchema }), asyncHandler(requestEmailChange));
+router.post('/confirm-email-change', validate({ body: confirmEmailChangeSchema }), asyncHandler(confirmEmailChange));
 
 export default router;

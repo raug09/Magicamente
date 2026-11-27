@@ -118,6 +118,29 @@ export const emailTemplates = {
       note: 'El enlace caduca en 1 hora y solo se puede usar una vez. Si no fuiste tú, ignora este mensaje: tu contraseña no cambiará.',
     }),
 
+  confirmEmailChange: (name: string, confirmLink: string) =>
+    build({
+      subject: 'Confirma tu nuevo correo',
+      heading: 'Confirma tu nuevo correo',
+      paragraphs: [
+        `Hola ${name}.`,
+        'Pediste cambiar el correo de tu cuenta a esta dirección. Para completar el cambio, confirma el enlace.',
+      ],
+      action: { label: 'Confirmar nuevo correo', url: confirmLink },
+      note: 'El enlace caduca en 24 horas y solo se puede usar una vez. Si no pediste este cambio, ignora este mensaje: tu correo no cambiará.',
+    }),
+
+  emailChangeRequested: (name: string) =>
+    build({
+      subject: 'Se ha pedido cambiar el correo de tu cuenta',
+      heading: 'Cambio de correo solicitado',
+      paragraphs: [
+        `Hola ${name}.`,
+        'Se ha pedido cambiar el correo de tu cuenta de Magicamente. El cambio solo se aplicará si se confirma desde la nueva dirección.',
+      ],
+      note: 'Si no fuiste tú, cambia tu contraseña cuanto antes para proteger tu cuenta.',
+    }),
+
   appointmentReminder: (name: string, date: string, hour: string) =>
     build({
       subject: 'Recordatorio de tu cita',
