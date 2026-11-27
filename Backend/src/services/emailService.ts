@@ -22,11 +22,11 @@ export const sendEmail = async <T extends EmailTemplateName>(
   to: string,
   ...args: Parameters<(typeof emailTemplates)[T]>
 ) => {
-  const template = emailTemplates[templateName] as (...a: string[]) => { subject: string; html: string };
+  const template = emailTemplates[templateName] as (...a: string[]) => { subject: string; html: string; text: string };
   if (!template) {
     throw new Error(`Plantilla de email '${templateName}' no encontrada`);
   }
-  const { subject, html } = template(...(args as string[]));
+  const { subject, html, text } = template(...(args as string[]));
 
   const resend = getResend();
   if (!resend) {
@@ -34,7 +34,7 @@ export const sendEmail = async <T extends EmailTemplateName>(
     return null;
   }
 
-  const { data, error } = await resend.emails.send({ from: getEmailFrom(), to, subject, html });
+  const { data, error } = await resend.emails.send({ from: getEmailFrom(), to, subject, html, text });
   if (error) {
     throw new Error(`No se pudo enviar el email: ${error.message}`);
   }

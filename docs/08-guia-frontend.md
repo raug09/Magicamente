@@ -229,6 +229,19 @@ POST /api/schedule  { "day": "2026-12-15", "hour": "10:00", "repeatWeeks": 8 }
 
 Ya se pueden crear franjas para **hoy** (en el calendario del psicólogo) siempre que su hora no haya empezado. Una franja ya empezada nunca se puede reservar: `GET /schedule/:id?available=true` ya la excluye.
 
+### Rutas a las que apuntan los correos
+
+Los botones de los correos llevan a estas rutas de `FRONTEND_URL`. El frontend debe crearlas con estos nombres:
+
+| Ruta | Correo | Qué hace |
+|---|---|---|
+| `/verify-email?token=…` | Confirmación de email | Llama a `POST /auth/verify-email` |
+| `/reset-password?token=…` | Recuperación de contraseña | Formulario de nueva contraseña |
+| `/citas` | Recordatorio de cita | Mis citas |
+| `/psicologos` | Aviso de cita cancelada | Listado de psicólogos |
+
+Las dos últimas son nombres elegidos por el backend; si el frontend usa otras rutas, dilo y se cambian en `config/emailTemplates.ts`.
+
 ## 7. Detalles que conviene saber
 
 - **El email se normaliza** (sin espacios, en minúsculas): el frontend puede enviarlo como lo escriba el usuario y mostrar el que devuelve el servidor.
