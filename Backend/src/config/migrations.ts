@@ -38,6 +38,18 @@ export const runMigrations = async (): Promise<void> => {
     logger.info(`Migración: ${approved.modifiedCount} cuenta(s) anteriores marcadas como aprobadas`);
   }
 
+  const approvedPsychologists = await User.updateMany(
+    { role: 'psicologo', verificationStatus: { $exists: false }, approved: true },
+    { $set: { verificationStatus: 'aprobado' } }
+  );
+  const pendingPsychologists = await User.updateMany(
+    { role: 'psicologo', verificationStatus: { $exists: false } },
+    { $set: { verificationStatus: 'pendiente' } }
+  );
+  if (approvedPsychologists.modifiedCount + pendingPsychologists.modifiedCount > 0) {
+    logger.info(`Migración: estado de verificación asignado a ${approvedPsychologists.modifiedCount + pendingPsychologists.modifiedCount} psicólogo(s)`);
+  }
+
   let migratedSchedules = 0;
   let batch: Parameters<typeof Schedule.bulkWrite>[0] = [];
   const flush = async () => {

@@ -117,80 +117,200 @@ describe('verificación de email', () => {
   });
 });
 
-describe('aprobación de psicólogos', () => {
-  const approveRequest = (admin: TestUser, id: string, approved: boolean) =>
-    request(app).put(`/api/users/${id}`).set(auth(admin)).send({ approved });
+describe('verificación de psicólogos', () => {
+  const ALL_OK = [
+    { key: 'tarjeta_profesional', status: 'ok' },
+    { key: 'cedula', status: 'ok' },
+    { key: 'diploma', status: 'ok' },
+  ];
+  const verify = (admin: TestUser, id: string, body: object) =>
+    request(app).put(`/api/users/${id}/verification`).set(auth(admin)).send(body);
+  const pendingPsychologist = async () => {
+    const psychologist = await createUser('psicologo');
+    await User.updateOne({ _id: psychologist.id }, { approved: false, verificationStatus: 'pendiente' });
+    return psychologist;
+  };
+  const sentTo = (template: string, email: string) =>
+    (vi.mocked(sendEmail).mock.calls as unknown as unknown[][]).filter((c) => c[0] === template && c[1] === email);
 
-  it('los psicólogos empiezan sin aprobar y los pacientes ya aprobados', async () => {
+  beforeEach(() => {
+    vi.mocked(sendEmail).mockClear();
+  });
+
+  it('un psicólogo nuevo queda pendiente con los tres documentos sin revisar; un paciente, aprobado', async () => {
     await register({ name: 'Ana', email: 'ana@example.com', password: 'secreto123', role: 'psicologo' });
     await register({ name: 'Luis', email: 'luis@example.com', password: 'secreto123' });
 
-    expect((await User.findOne({ email: 'ana@example.com' }))?.approved).toBe(false);
-    expect((await User.findOne({ email: 'luis@example.com' }))?.approved).toBe(true);
+    const ana = await User.findOne({ email: 'ana@example.com' });
+    expect(ana?.verificationStatus).toBe('pendiente');
+    expect(ana?.approved).toBe(false);
+    expect(ana?.verificationDocuments?.map((d) => d.status)).toEqual(['pendiente', 'pendiente', 'pendiente']);
+
+    const luis = await User.findOne({ email: 'luis@example.com' });
+    expect(luis?.verificationStatus).toBe('aprobado');
+    expect(luis?.approved).toBe(true);
   });
 
   it('un psicólogo pendiente puede iniciar sesión pero no publicar franjas', async () => {
-    const psychologist = await createUser('psicologo');
-    await User.updateOne({ _id: psychologist.id }, { approved: false });
-
+    const psychologist = await pendingPsychologist();
     expect((await login(psychologist.email)).status).toBe(200);
-    const res = await request(app)
-      .post('/api/schedule')
-      .set(auth(psychologist))
-      .send({ day: futureDay(10), hour: '10:00' });
+    const res = await request(app).post('/api/schedule').set(auth(psychologist)).send({ day: futureDay(10), hour: '10:00' });
     expect(res.status).toBe(403);
     expect(res.body.message).toMatch(/pendiente de aprobación/);
   });
 
   it('un psicólogo pendiente no aparece en el listado ni se puede reservar', async () => {
     const patient = await createUser('paciente');
-    const psychologist = await createUser('psicologo');
+    const psychologist = await pendingPsychologist();
     const schedule = await createScheduleFor(psychologist.id);
-    await User.updateOne({ _id: psychologist.id }, { approved: false });
 
     const list = await request(app).get('/api/psychologists').set(auth(patient));
     expect(list.body.total).toBe(0);
-    expect((await request(app).get(`/api/users/${psychologist.id}`).set(auth(patient))).status).toBe(404);
-
-    const booked = await request(app)
-      .post('/api/appointments/appointment')
-      .set(auth(patient))
-      .send({ scheduleId: String(schedule._id) });
+    const booked = await request(app).post('/api/appointments/appointment').set(auth(patient)).send({ scheduleId: String(schedule._id) });
     expect(booked.status).toBe(409);
   });
 
-  it('un paciente no puede aprobarse a sí mismo ni a otros', async () => {
+  it('solo un administrador puede verificar: ni el paciente ni el propio psicólogo', async () => {
     const patient = await createUser('paciente');
-    expect((await approveRequest(patient, patient.id, true)).status).toBe(403);
+    const psychologist = await pendingPsychologist();
+    expect((await verify(patient, psychologist.id, { status: 'aprobado', documents: ALL_OK })).status).toBe(403);
+    expect((await verify(psychologist, psychologist.id, { status: 'aprobado', documents: ALL_OK })).status).toBe(403);
   });
 
-  it('el administrador aprueba a un psicólogo, que entonces ya puede publicar', async () => {
+  it('PUT /users/:id ya no puede cambiar la aprobación, ni siquiera un administrador', async () => {
     const admin = await createUser('administrador');
-    const psychologist = await createUser('psicologo');
-    await User.updateOne({ _id: psychologist.id }, { approved: false });
-
-    expect((await approveRequest(admin, psychologist.id, true)).status).toBe(200);
-    const res = await request(app)
-      .post('/api/schedule')
-      .set(auth(psychologist))
-      .send({ day: futureDay(10), hour: '10:00' });
-    expect(res.status).toBe(201);
+    const psychologist = await pendingPsychologist();
+    const res = await request(app).put(`/api/users/${psychologist.id}`).set(auth(admin)).send({ approved: true });
+    expect(res.status).toBe(403);
+    expect((await User.findById(psychologist.id))?.approved).toBe(false);
   });
 
-  it('el administrador puede revocar la aprobación', async () => {
+  it('aprobar exige que todos los documentos estén correctos (400 indicando cuáles faltan)', async () => {
+    const admin = await createUser('administrador');
+    const psychologist = await pendingPsychologist();
+    const res = await verify(admin, psychologist.id, { status: 'aprobado', documents: [{ key: 'cedula', status: 'ok' }] });
+    expect(res.status).toBe(400);
+    expect(res.body.message).toMatch(/Tarjeta profesional/);
+    expect((await User.findById(psychologist.id))?.approved).toBe(false);
+  });
+
+  it('aprobar con todo correcto: el psicólogo queda aprobado, puede publicar y recibe un correo', async () => {
+    const admin = await createUser('administrador');
+    const psychologist = await pendingPsychologist();
+
+    const res = await verify(admin, psychologist.id, { status: 'aprobado', documents: ALL_OK });
+    expect(res.status).toBe(200);
+    expect(res.body.verificationStatus).toBe('aprobado');
+
+    const created = await request(app).post('/api/schedule').set(auth(psychologist)).send({ day: futureDay(10), hour: '10:00' });
+    expect(created.status).toBe(201);
+    await vi.waitFor(() => expect(sentTo('verificationApproved', psychologist.email)).toHaveLength(1));
+  });
+
+  it('rechazar exige un mensaje', async () => {
+    const admin = await createUser('administrador');
+    const psychologist = await pendingPsychologist();
+    expect((await verify(admin, psychologist.id, { status: 'rechazado' })).status).toBe(400);
+    expect((await verify(admin, psychologist.id, { status: 'rechazado', message: '   ' })).status).toBe(400);
+    expect(sendEmail).not.toHaveBeenCalled();
+  });
+
+  it('rechazar guarda el mensaje y el documento señalado, y envía el correo con ese documento resaltado', async () => {
+    const admin = await createUser('administrador');
+    const psychologist = await pendingPsychologist();
+
+    const res = await verify(admin, psychologist.id, {
+      status: 'rechazado',
+      message: 'La tarjeta profesional no se lee bien. Sube una foto nítida.',
+      documents: [
+        { key: 'tarjeta_profesional', status: 'rechazado', note: 'Imagen borrosa' },
+        { key: 'cedula', status: 'ok' },
+      ],
+    });
+    expect(res.status).toBe(200);
+    expect(res.body.verificationStatus).toBe('rechazado');
+    expect(res.body.verificationMessage).toMatch(/no se lee bien/);
+
+    await vi.waitFor(() => expect(sentTo('verificationRejected', psychologist.email)).toHaveLength(1));
+    const [, , , message, documents] = sentTo('verificationRejected', psychologist.email)[0] as unknown[];
+    expect(message).toMatch(/no se lee bien/);
+    expect(documents).toEqual([
+      { label: 'Tarjeta profesional', status: 'rechazado', note: 'Imagen borrosa' },
+      { label: 'Cédula de ciudadanía', status: 'ok', note: undefined },
+      { label: 'Diploma de psicología', status: 'pendiente', note: undefined },
+    ]);
+  });
+
+  it('el mensaje de rechazo se escapa en el correo y el documento rechazado queda resaltado en el HTML', async () => {
+    const { emailTemplates } = await import('../src/config/emailTemplates');
+    const mail = emailTemplates.verificationRejected(
+      'Ana',
+      '<img src=x onerror=alert(1)>',
+      [{ label: 'Tarjeta profesional', status: 'rechazado', note: 'Borrosa' }],
+      'https://x.example/perfil'
+    );
+    expect(mail.html).not.toContain('<img src=x');
+    expect(mail.html).toContain('&lt;img src=x');
+    expect(mail.html).toMatch(/Tarjeta profesional: revisar este documento/);
+    expect(mail.text).toContain('[REVISAR] Tarjeta profesional — Borrosa');
+  });
+
+  it('el psicólogo rechazado ve su motivo en /auth/me y no puede publicar (mensaje propio)', async () => {
+    const admin = await createUser('administrador');
+    const psychologist = await pendingPsychologist();
+    await verify(admin, psychologist.id, { status: 'rechazado', message: 'Falta la cédula', documents: [{ key: 'cedula', status: 'rechazado' }] });
+
+    const login1 = await login(psychologist.email);
+    const me = await request(app).get('/api/auth/me').set({ Authorization: `Bearer ${login1.body.token}` });
+    expect(me.body.verificationStatus).toBe('rechazado');
+    expect(me.body.verificationMessage).toMatch(/Falta la cédula/);
+    expect(me.body.verificationDocuments.find((d: { key: string }) => d.key === 'cedula').status).toBe('rechazado');
+
+    const created = await request(app).post('/api/schedule').set(auth(psychologist)).send({ day: futureDay(10), hour: '10:00' });
+    expect(created.status).toBe(403);
+    expect(created.body.message).toMatch(/fue rechazada/);
+  });
+
+  it('pasar de rechazado a pendiente borra el mensaje y no envía correo', async () => {
+    const admin = await createUser('administrador');
+    const psychologist = await pendingPsychologist();
+    await verify(admin, psychologist.id, { status: 'rechazado', message: 'Revisa todo' });
+    await vi.waitFor(() => expect(sendEmail).toHaveBeenCalledTimes(1));
+    vi.mocked(sendEmail).mockClear();
+
+    const res = await verify(admin, psychologist.id, { status: 'pendiente' });
+    expect(res.status).toBe(200);
+    expect(res.body.verificationMessage).toBeUndefined();
+    expect(sendEmail).not.toHaveBeenCalled();
+  });
+
+  it('repetir la misma decisión no reenvía el correo', async () => {
+    const admin = await createUser('administrador');
+    const psychologist = await pendingPsychologist();
+    await verify(admin, psychologist.id, { status: 'aprobado', documents: ALL_OK });
+    await verify(admin, psychologist.id, { status: 'aprobado', documents: ALL_OK });
+    await vi.waitFor(() => expect(sentTo('verificationApproved', psychologist.email)).toHaveLength(1));
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(sentTo('verificationApproved', psychologist.email)).toHaveLength(1);
+  });
+
+  it('quitar la aprobación deja al psicólogo fuera del listado (sin correo)', async () => {
     const admin = await createUser('administrador');
     const psychologist = await createUser('psicologo');
-    expect((await approveRequest(admin, psychologist.id, false)).status).toBe(200);
-
+    const res = await verify(admin, psychologist.id, { status: 'pendiente' });
+    expect(res.status).toBe(200);
     const patient = await createUser('paciente');
     expect((await request(app).get('/api/psychologists').set(auth(patient))).body.total).toBe(0);
+    expect(sendEmail).not.toHaveBeenCalled();
   });
 
-  it('solo se aprueba a psicólogos (400 para pacientes) y el valor debe ser booleano', async () => {
+  it('solo se verifica a psicólogos (400 para pacientes), y el estado debe ser válido', async () => {
     const admin = await createUser('administrador');
     const patient = await createUser('paciente');
-    expect((await approveRequest(admin, patient.id, true)).status).toBe(400);
-    expect((await request(app).put(`/api/users/${patient.id}`).set(auth(admin)).send({ approved: 'si' })).status).toBe(400);
+    expect((await verify(admin, patient.id, { status: 'aprobado', documents: ALL_OK })).status).toBe(400);
+    const psychologist = await pendingPsychologist();
+    expect((await verify(admin, psychologist.id, { status: 'inventado' })).status).toBe(400);
+    expect((await verify(admin, psychologist.id, { status: 'aprobado', documents: [{ key: 'otro', status: 'ok' }] })).status).toBe(400);
   });
 });
 

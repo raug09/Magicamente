@@ -29,6 +29,7 @@ Leyenda: ✅ funciona · ⚠️ funciona con salvedades · ❌ roto (detalles en
 | GET | `/api/users/:id` | 🔒 | Perfil propio, o perfil público de un psicólogo | ✅ |
 | PUT | `/api/users/:id` | 🔒 uno mismo o admin | Actualizar usuario | ✅ |
 | DELETE | `/api/users/:id` | 🔒 uno mismo o admin | Eliminar cuenta (anonimiza y limpia sus citas y franjas) | ✅ |
+| PUT | `/api/users/:id/verification` | 🔒 admin | Aprobar, rechazar o volver a pendiente a un psicólogo, con la revisión de sus documentos | ✅ |
 | POST | `/api/schedule` | 🔒 psicólogo o admin | Crear franja horaria | ✅ |
 | GET | `/api/psychologists` | 🔒 | Listado de psicólogos (búsqueda y paginación) | ✅ |
 | GET | `/api/schedule/:psychologistId` | 🔒 | Franjas de un psicólogo (con filtros y paginación) | ✅ |

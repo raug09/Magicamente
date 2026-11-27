@@ -18,7 +18,7 @@ const PUBLIC_PSYCHOLOGIST_FIELDS = 'name role studies description';
 /** Campos que cualquier usuario puede cambiar de su propia cuenta. */
 const SELF_EDITABLE = ['name', 'description', 'studies', 'password', 'timezone'] as const;
 /** Campos que además puede cambiar un administrador. */
-const ADMIN_EDITABLE = [...SELF_EDITABLE, 'email', 'role', 'isActive', 'approved'] as const;
+const ADMIN_EDITABLE = [...SELF_EDITABLE, 'email', 'role', 'isActive'] as const;
 
 /** Las cuentas eliminadas se conservan (anonimizadas) pero nunca se muestran. */
 const NOT_DELETED = { deletedAt: null };
@@ -53,13 +53,6 @@ export const updateUserService = async (
   if ('password' in update) {
     update.password = await hashPassword(assertValidPassword(update.password));
     update.passwordChangedAt = new Date(); // invalida las sesiones abiertas (también la actual)
-  }
-  if ('approved' in update) {
-    const target = await User.findOne({ _id: id, ...NOT_DELETED }).select('role');
-    if (!target) return null;
-    if (target.role !== 'psicologo') {
-      throw new AppError(400, 'Solo se aprueba a los psicólogos');
-    }
   }
   if ('timezone' in update) {
     update.timezone = assertValidTimeZone(update.timezone);

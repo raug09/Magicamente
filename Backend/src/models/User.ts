@@ -1,6 +1,7 @@
 import { Schema, model, Document, Types } from 'mongoose';
 import { getAppTimezone } from '../config/env';
 import { isValidTimeZone } from '../utils/timezone';
+import { DocumentReview, VerificationStatus, DOCUMENT_REVIEW_STATUSES, PSYCHOLOGIST_DOCUMENT_KEYS, VERIFICATION_STATUSES } from '../utils/verification';
 
 export interface IUser extends Document {
   name: string;
@@ -29,6 +30,11 @@ export interface IUser extends Document {
   /** Los psicólogos empiezan sin aprobar: un administrador los aprueba. Los demás roles siempre están aprobados. */
   approved?: boolean;
   /** Cambio de email pendiente de confirmar (se aplica al confirmar el enlace enviado al nuevo email). */
+  /** Estado de la verificación (solo psicólogos; los demás roles quedan 'aprobado'). */
+  verificationStatus?: VerificationStatus;
+  /** Mensaje del equipo cuando se rechaza la solicitud. */
+  verificationMessage?: string;
+  verificationDocuments?: DocumentReview[];
   pendingEmail?: string;
   emailChangeTokenHash?: string;
   emailChangeExpires?: Date;
@@ -58,6 +64,22 @@ const UserSchema = new Schema<IUser>({
   emailVerificationTokenHash: { type: String, select: false },
   emailVerificationExpires: { type: Date, select: false },
   emailVerificationSentAt: { type: Date, select: false },
+  verificationStatus: {
+    type: String,
+    enum: VERIFICATION_STATUSES,
+    default: function (this: { role?: string }) {
+      return this.role === 'psicologo' ? 'pendiente' : 'aprobado';
+    },
+  },
+  verificationMessage: { type: String },
+  verificationDocuments: [
+    {
+      _id: false,
+      key: { type: String, enum: PSYCHOLOGIST_DOCUMENT_KEYS, required: true },
+      status: { type: String, enum: DOCUMENT_REVIEW_STATUSES, default: 'pendiente' },
+      note: { type: String, default: '' },
+    },
+  ],
   pendingEmail: { type: String, select: false },
   emailChangeTokenHash: { type: String, select: false },
   emailChangeExpires: { type: Date, select: false },

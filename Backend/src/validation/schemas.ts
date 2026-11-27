@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { ROLES } from '../middlewares/auth';
 import { isValidTimeZone, parseDayString } from '../utils/timezone';
+import { PSYCHOLOGIST_DOCUMENT_KEYS, VERIFICATION_STATUSES } from '../utils/verification';
 
 // --- Piezas reutilizables ------------------------------------------------------------------
 
@@ -88,7 +89,6 @@ export const updateUserSchema = z
     email: validEmail.optional(),
     role: z.enum(ROLES, { errorMap: () => ({ message: `role debe ser uno de: ${ROLES.join(', ')}` }) }).optional(),
     isActive: z.boolean({ invalid_type_error: 'isActive debe ser true o false' }).optional(),
-    approved: z.boolean({ invalid_type_error: 'approved debe ser true o false' }).optional(),
   })
   .passthrough();
 
@@ -155,3 +155,18 @@ export const createAppointmentSchema = z.object({ scheduleId: text('scheduleId',
 export const updateAppointmentSchema = z.object({ state: z.string({ invalid_type_error: 'state debe ser un texto' }).optional() }).passthrough();
 
 export const listAppointmentsQuery = z.object({ ...pagination });
+
+// --- Verificación de psicólogos (administrador) ----------------------------------------------
+
+const documentReviewInput = z.object({
+  key: z.enum(PSYCHOLOGIST_DOCUMENT_KEYS, { errorMap: () => ({ message: 'key no es un documento válido' }) }),
+  status: z.enum(['ok', 'rechazado'], { errorMap: () => ({ message: 'status del documento debe ser ok o rechazado' }) }),
+  note: z.string({ invalid_type_error: 'note debe ser un texto' }).trim().max(500, 'note es demasiado largo').optional(),
+});
+
+export const verificationSchema = z.object({
+  status: z.enum(VERIFICATION_STATUSES, { errorMap: () => ({ message: 'status debe ser pendiente, rechazado o aprobado' }) }),
+  message: z.string({ invalid_type_error: 'message debe ser un texto' }).trim().max(1000, 'message es demasiado largo').optional(),
+  documents: z.array(documentReviewInput).max(10, 'documents admite como máximo 10 elementos').optional(),
+});
+

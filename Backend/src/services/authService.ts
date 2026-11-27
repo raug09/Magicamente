@@ -9,6 +9,7 @@ import { AppError } from '../utils/AppError';
 import { Role } from '../middlewares/auth';
 import { assertValidPassword } from '../utils/password';
 import { assertValidTimeZone } from '../utils/timezone';
+import { initialDocumentReviews } from '../utils/verification';
 import { logger } from '../utils/logger';
 
 /** Roles que se pueden elegir en el registro público. Los administradores se crean aparte. */
@@ -85,6 +86,7 @@ export const registerService = async ({ name, email, password, role = 'paciente'
     role,
     studies,
     ...(timezone !== undefined && { timezone }),
+    ...(role === 'psicologo' && { verificationDocuments: initialDocumentReviews() }),
   });
   await newUser.save();
   await issueEmailVerification(newUser._id, newUser.email, newUser.name);

@@ -49,7 +49,12 @@ export const createSchedules = async ({ psychologist, day, hour, repeatWeeks = 1
     throw new AppError(404, 'Psicólogo no encontrado');
   }
   if (psychologistUser.approved === false) {
-    throw new AppError(403, 'Tu cuenta de psicólogo está pendiente de aprobación');
+    throw new AppError(
+      403,
+      psychologistUser.verificationStatus === 'rechazado'
+        ? 'Tu solicitud fue rechazada. Revisa el motivo y los documentos señalados en tu perfil.'
+        : 'Tu cuenta de psicólogo está pendiente de aprobación'
+    );
   }
   const timezone = timezoneOf(psychologistUser);
 

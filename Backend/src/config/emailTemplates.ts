@@ -21,6 +21,9 @@ const escapeHtml = (text: string): string =>
 
 interface Content {
   subject: string;
+  /** HTML y texto ya preparados (listas, citas) que se insertan después de los párrafos. */
+  extraHtml?: string;
+  extraText?: string[];
   /** Título grande dentro de la tarjeta. */
   heading: string;
   /** Párrafos del cuerpo (texto plano; se escapan al renderizar). */
@@ -37,6 +40,7 @@ const renderHtml = (content: Content): string => {
     .map((p) => `<p style="margin:0 0 16px;font-size:16px;line-height:24px;color:${COLORS.text};">${escapeHtml(p)}</p>`)
     .join('');
 
+  const extra = content.extraHtml ?? '';
   const button = content.action
     ? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:8px 0 24px;">
          <tr><td style="border-radius:8px;background:${COLORS.brand};">
@@ -68,6 +72,7 @@ const renderHtml = (content: Content): string => {
           <tr><td style="background:${COLORS.card};border-radius:12px;padding:32px 28px;">
             <h1 style="margin:0 0 20px;font-size:22px;line-height:28px;color:${COLORS.text};">${escapeHtml(content.heading)}</h1>
             ${paragraphs}
+            ${extra}
             ${button}
             ${note}
           </td></tr>
@@ -84,7 +89,7 @@ const renderHtml = (content: Content): string => {
 
 /** Versión de texto plano del mismo contenido. */
 const renderText = (content: Content): string => {
-  const parts = [content.heading, '', ...content.paragraphs];
+  const parts = [content.heading, '', ...content.paragraphs, ...(content.extraText ?? [])];
   if (content.action) parts.push('', `${content.action.label}: ${content.action.url}`);
   if (content.note) parts.push('', content.note);
   parts.push('', `— ${APP_NAME}`);
@@ -93,7 +98,62 @@ const renderText = (content: Content): string => {
 
 const build = (content: Content) => ({ subject: content.subject, html: renderHtml(content), text: renderText(content) });
 
+/** Un documento en el correo de rechazo: el rechazado se destaca. */
+export interface DocumentLine {
+  label: string;
+  status: 'pendiente' | 'ok' | 'rechazado';
+  note?: string;
+}
+
+const documentListHtml = (documents: DocumentLine[]): string =>
+  documents
+    .map((doc) => {
+      if (doc.status === 'rechazado') {
+        return `<div style="margin:0 0 12px;padding:14px 16px;border:2px solid #c0392b;border-radius:8px;background:#fdecea;">
+          <div style="font-size:16px;font-weight:bold;color:#c0392b;">✗ ${escapeHtml(doc.label)}: revisar este documento</div>
+          ${doc.note ? `<div style="margin-top:6px;font-size:14px;color:${COLORS.text};">${escapeHtml(doc.note)}</div>` : ''}
+        </div>`;
+      }
+      const mark = doc.status === 'ok' ? '✓' : '•';
+      const state = doc.status === 'ok' ? 'correcto' : 'pendiente de revisión';
+      return `<div style="margin:0 0 8px;font-size:15px;color:${COLORS.muted};">${mark} ${escapeHtml(doc.label)}: ${state}</div>`;
+    })
+    .join('');
+
+const documentListText = (documents: DocumentLine[]): string[] =>
+  documents.map((doc) => {
+    const mark = doc.status === 'rechazado' ? '[REVISAR]' : doc.status === 'ok' ? '[OK]' : '[PENDIENTE]';
+    return `${mark} ${doc.label}${doc.note ? ` — ${doc.note}` : ''}`;
+  });
+
 export const emailTemplates = {
+  verificationApproved: (name: string, agendaLink: string) =>
+    build({
+      subject: 'Tu cuenta de psicólogo ha sido aprobada',
+      heading: 'Cuenta aprobada',
+      paragraphs: [
+        `Hola ${name}.`,
+        'Revisamos tus documentos y tu cuenta ya está aprobada. Ya puedes publicar tu agenda, y los pacientes podrán reservar contigo.',
+      ],
+      action: { label: 'Ir a mi agenda', url: agendaLink },
+    }),
+
+  verificationRejected: (name: string, message: string, documents: DocumentLine[], profileLink: string) => {
+    const extraHtml =
+      `<div style="margin:0 0 20px;padding:14px 16px;border-left:4px solid ${COLORS.brand};background:#f3f6f5;font-size:15px;line-height:22px;color:${COLORS.text};white-space:pre-line;">${escapeHtml(message)}</div>` +
+      `<p style="margin:0 0 12px;font-size:15px;font-weight:bold;color:${COLORS.text};">Documentos</p>` +
+      documentListHtml(documents);
+    return build({
+      subject: 'Necesitamos revisar tu solicitud de psicólogo',
+      heading: 'Necesitamos que revises algunos documentos',
+      paragraphs: [`Hola ${name}.`, 'No hemos podido aprobar tu cuenta todavía. Este es el mensaje del equipo:'],
+      extraHtml,
+      extraText: ['', message, '', 'Documentos:', ...documentListText(documents)],
+      action: { label: 'Corregir mi solicitud', url: profileLink },
+      note: 'Corrige los documentos señalados desde tu perfil. No necesitas crear una cuenta nueva.',
+    });
+  },
+
   verifyEmail: (name: string, verifyLink: string) =>
     build({
       subject: `Confirma tu correo en ${APP_NAME}`,

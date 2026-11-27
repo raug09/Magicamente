@@ -7,6 +7,7 @@ import {
   listUsersService,
 } from '../services/userService';
 import { AppError } from '../utils/AppError';
+import { setVerificationService } from '../services/verificationService';
 
 /**
  * Uno mismo y los administradores ven el perfil completo.
@@ -43,4 +44,10 @@ export const deleteUser = async (req: Request, res: Response) => {
 
 export const listUsers = async (req: Request, res: Response) => {
   res.status(200).json(await listUsersService());
+};
+
+/** Aprobar, rechazar o devolver a pendiente la solicitud de un psicólogo, con la revisión de sus documentos. */
+export const setVerification = async (req: Request, res: Response) => {
+  const user = await setVerificationService(req.params.id, req.body);
+  res.status(200).json(user);
 };

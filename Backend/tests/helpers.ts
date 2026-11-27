@@ -36,6 +36,7 @@ export const createUser = async (role: Role, password = 'secreto123'): Promise<T
     role,
     emailVerified: true,
     approved: true,
+    verificationStatus: 'aprobado',
   });
   const token = await sessionToken(user._id, role);
   return { id: String(user._id), token, email };
