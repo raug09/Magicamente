@@ -78,7 +78,7 @@ test('recuperar contraseña: pide el enlace sin revelar si la cuenta existe', as
 
 test('restablecer contraseña con un enlace no válido muestra el error', async ({ page }) => {
   await page.goto('/reset-password?token=token-que-no-existe');
-  await page.getByLabel('Contraseña nueva', { exact: true }).fill('nueva-clave-123');
+  await page.getByLabel(/^Contraseña nueva/).fill('nueva-clave-123');
   await page.getByLabel('Repite la contraseña').fill('nueva-clave-123');
   await page.getByRole('button', { name: 'Cambiar contraseña' }).click();
   await expect(page.getByRole('alert')).toContainText('no es válido');
@@ -86,7 +86,7 @@ test('restablecer contraseña con un enlace no válido muestra el error', async 
 
 test('las contraseñas que no coinciden se avisan antes de enviar', async ({ page }) => {
   await page.goto('/reset-password?token=abc');
-  await page.getByLabel('Contraseña nueva', { exact: true }).fill('nueva-clave-123');
+  await page.getByLabel(/^Contraseña nueva/).fill('nueva-clave-123');
   await page.getByLabel('Repite la contraseña').fill('otra-clave-456');
   await expect(page.getByText('No coincide con la contraseña')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Cambiar contraseña' })).toBeDisabled();
