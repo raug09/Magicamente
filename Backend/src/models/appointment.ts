@@ -29,6 +29,11 @@ const appointmentSchema = new Schema<IAppointment>(
   { autoIndex: false }
 );
 
+// Consultas frecuentes: "mis citas" (ordenadas por fecha) y el recordatorio del cron.
+appointmentSchema.index({ patientId: 1, time: 1 });
+appointmentSchema.index({ psychologistId: 1, time: 1 });
+appointmentSchema.index({ state: 1, reminderSent: 1, time: 1 });
+
 // Una franja solo puede tener UNA cita viva (pendiente o completada). Las canceladas no cuentan,
 // así que una franja cancelada se puede volver a reservar.
 appointmentSchema.index(

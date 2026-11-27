@@ -70,4 +70,7 @@ const UserSchema = new Schema<IUser>({
   },
 });
 
+// Listado de psicólogos: rol + aprobación + activo.
+UserSchema.index({ role: 1, approved: 1, isActive: 1 });
+
 export default model<IUser>('User', UserSchema);

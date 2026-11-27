@@ -32,6 +32,8 @@ const ScheduleSchema = new Schema<ISchedule>(
 // Una franja por día y hora para cada psicólogo. La base de datos rechaza duplicados aunque
 // dos peticiones lleguen a la vez (el código de error es 11000).
 ScheduleSchema.index({ psychologist: 1, day: 1, hour: 1 }, { unique: true });
+// Franjas de un psicólogo ordenadas por instante de inicio (listado y filtros).
+ScheduleSchema.index({ psychologist: 1, startsAt: 1 });
 
 // `startsAt` siempre es coherente con día, hora y zona, incluso si una franja se crea sin indicarlo.
 ScheduleSchema.pre('validate', function (next) {
