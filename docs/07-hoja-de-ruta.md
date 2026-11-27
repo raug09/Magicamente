@@ -19,9 +19,12 @@ Las referencias (S1, F2…) apuntan a [06 · Problemas conocidos](06-problemas-c
 - Reserva atómica y errores 400/404/409 en lugar de 201 (F6, F15).
 - `update` solo marca `completada`, por el psicólogo y tras la cita (F10, F18).
 
+## ✅ Hecho: listado de psicólogos (F8)
+
+- `GET /api/psychologists` con búsqueda por nombre, paginación y solo campos públicos.
+
 ## Siguiente · Completar el producto mínimo
 
-- [ ] `GET /api/psychologists` con nombre, estudios y descripción (F8).
 - [ ] `GET /api/schedule/:id?from=&available=true` con filtros; `PUT`/`DELETE` de franjas (solo si no hay cita).
 - [ ] `GET /api/auth/me` para que el frontend obtenga el usuario sin decodificar el JWT.
 - [ ] Recuperación de contraseña (la plantilla `resetPassword` ya existe).

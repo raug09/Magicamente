@@ -51,7 +51,10 @@ flowchart TD
 
 La reserva es atómica: la franja se marca ocupada con una sola operación condicionada a `isAvailable: true`, así que si dos pacientes llegan a la vez solo uno recibe 201 y el otro 409. Si crear la cita falla después, la franja se libera.
 
-**¿Cómo encuentra el paciente a un psicólogo?** Si conoce su id, puede ver su perfil público con `GET /api/users/:id`. Pero todavía no hay un listado de psicólogos (`GET /api/users` es solo para administradores). Hay que añadirlo (ver hoja de ruta).
+**¿Cómo encuentra el paciente a un psicólogo?**
+1. `GET /api/psychologists?q=ana` → lista de psicólogos activos (nombre, estudios y descripción).
+2. `GET /api/schedule/:id` con el `_id` elegido → sus franjas; el cliente se queda con las de `isAvailable: true`.
+3. `POST /api/appointments/appointment` con el `scheduleId`.
 
 ## 4. Ver, cancelar y completar
 

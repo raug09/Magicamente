@@ -64,15 +64,15 @@ PSI_TOKEN=$(curl -s -X POST $API/api/auth/login -H 'Content-Type: application/js
 PAC_TOKEN=$(curl -s -X POST $API/api/auth/login -H 'Content-Type: application/json' \
   -d '{"email":"luis@example.com","password":"secreto123"}' | json token)
 
-# 3. El id del psicólogo (el paciente lo necesita para ver sus franjas)
+# 3. El id del psicólogo (en la práctica, el paciente lo obtiene del listado del paso 5)
 PSI_ID=$(node -pe "JSON.parse(Buffer.from('$PSI_TOKEN'.split('.')[1],'base64url')).id")
 
 # 4. El psicólogo publica una franja (siempre para sí mismo)
 SCHEDULE_ID=$(curl -s -X POST $API/api/schedule -H "Authorization: Bearer $PSI_TOKEN" -H 'Content-Type: application/json' \
   -d '{"day":"2026-12-15","hour":"10:00"}' | json schedule._id)
 
-# 5. El paciente ve el perfil público y las franjas del psicólogo
-curl -s $API/api/users/$PSI_ID -H "Authorization: Bearer $PAC_TOKEN"
+# 5. El paciente busca psicólogos, y mira las franjas del elegido
+curl -s "$API/api/psychologists?q=ana" -H "Authorization: Bearer $PAC_TOKEN"
 curl -s $API/api/schedule/$PSI_ID -H "Authorization: Bearer $PAC_TOKEN"
 
 # 6. Reservar: solo hace falta el scheduleId

@@ -4,7 +4,7 @@
 
 API REST para una plataforma de **citas con psicólogos**: los psicólogos publican franjas horarias, los pacientes reservan citas y el sistema envía correos (confirmación de registro y recordatorio el día antes de la cita).
 
-> **Estado:** prototipo en desarrollo. Ya están corregidos los agujeros de seguridad críticos, los permisos y el recordatorio de citas, y hay tests de integración con CI. El flujo de citas (reservar, ver, cancelar, completar) funciona de extremo a extremo. Falta, sobre todo, un listado de psicólogos para pacientes. Véase [Problemas conocidos](docs/06-problemas-conocidos.md).
+> **Estado:** prototipo en desarrollo. Ya están corregidos los agujeros de seguridad críticos, los permisos y el recordatorio de citas, y hay tests de integración con CI. El flujo de citas (reservar, ver, cancelar, completar) funciona de extremo a extremo. Los pacientes pueden buscar psicólogos, ver sus franjas y reservar. Véase [Problemas conocidos](docs/06-problemas-conocidos.md).
 > El repositorio **no incluye frontend**.
 
 ## Stack

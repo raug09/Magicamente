@@ -88,6 +88,7 @@ Los servicios y controladores lanzan `new AppError(404, 'Usuario no encontrado')
 | `/api/users` | `routes/user.ts` |
 | `/api/appointments` | `routes/appointment.ts` |
 | `/api/schedule` | `routes/schedule.ts` |
+| `/api/psychologists` | `routes/psychologist.ts` |
 
 ## Autenticación y autorización
 
@@ -118,5 +119,5 @@ Roles: `paciente` (por defecto), `psicologo`, `administrador`. El registro públ
 
 - `tests/setup.ts` arranca una MongoDB en memoria (`mongodb-memory-server`), fija `JWT_SECRET` y vacía las colecciones tras cada test. La primera ejecución descarga el binario de MongoDB (~100 MB) desde fastdl.mongodb.org.
 - `tests/helpers.ts`: `createUser(rol)` crea usuarios directamente en la BD (incluidos administradores) y devuelve su token.
-- Ficheros: `auth`, `users`, `schedule`, `appointments`, `migrations`, `reminders` (con `sendEmail` simulado) y `env`.
+- Ficheros: `auth`, `users`, `psychologists`, `schedule`, `appointments`, `migrations`, `reminders` (con `sendEmail` simulado) y `env`.
 - CI: `.github/workflows/backend.yml` ejecuta typecheck, build y tests en cada push y pull request.

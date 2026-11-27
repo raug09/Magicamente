@@ -18,6 +18,7 @@ Leyenda: ✅ funciona · ⚠️ funciona con salvedades · ❌ roto (detalles en
 | PUT | `/api/users/:id` | 🔒 uno mismo o admin | Actualizar usuario | ✅ |
 | DELETE | `/api/users/:id` | 🔒 uno mismo o admin | Borrar usuario | ⚠️ no borra en cascada |
 | POST | `/api/schedule` | 🔒 psicólogo o admin | Crear franja horaria | ✅ |
+| GET | `/api/psychologists` | 🔒 | Listado de psicólogos (búsqueda y paginación) | ✅ |
 | GET | `/api/schedule/:psychologistId` | 🔒 | Franjas de un psicólogo | ✅ |
 | GET | `/api/appointments/appointment` | 🔒 paciente o psicólogo | Mis citas | ✅ |
 | POST | `/api/appointments/appointment` | 🔒 paciente | Reservar cita | ✅ |
@@ -84,6 +85,34 @@ Campos permitidos:
 
 ### `DELETE /api/users/:id` 🔒 uno mismo o admin
 `200 { "message": "Usuario eliminado correctamente" }` · `404` si no existe. No borra horarios ni citas asociados.
+
+## Psicólogos
+
+### `GET /api/psychologists` 🔒
+
+Listado de psicólogos **activos** para que un paciente elija. Lo puede usar cualquier usuario autenticado.
+
+| Parámetro | Por defecto | Descripción |
+|---|---|---|
+| `q` | — | Texto a buscar en el nombre, sin distinguir mayúsculas (se toma literal) |
+| `page` | `1` | Página (entero ≥ 1) |
+| `limit` | `20` | Resultados por página (entero ≥ 1, máximo 50; un valor mayor se recorta a 50) |
+
+```json
+{
+  "total": 3,
+  "page": 1,
+  "limit": 20,
+  "psychologists": [
+    { "_id": "6740...", "name": "Ana Pérez", "studies": ["Psicología clínica"], "description": "Terapia cognitiva" }
+  ]
+}
+```
+
+- Ordenado por nombre. Solo se exponen `_id`, `name`, `studies` y `description`: nunca email, contraseña ni horarios.
+- No aparecen los usuarios con `isActive: false`.
+- Parámetros no válidos (`page=0`, `limit=abc`, `q` repetido) → `400`.
+- Con el `_id` se piden sus franjas: `GET /api/schedule/:psychologistId` y se filtra por `isAvailable`.
 
 ## Horarios
 

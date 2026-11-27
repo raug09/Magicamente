@@ -4,6 +4,7 @@ import authRoutes from './routes/auth';
 import userRoutes from './routes/user';
 import appointmentRoutes from './routes/appointment';
 import scheduleRoutes from './routes/schedule';
+import psychologistRoutes from './routes/psychologist';
 import { errorHandler, notFoundHandler } from './middlewares/errorHandler';
 
 /** Crea la aplicación Express sin conectar a la BD ni escuchar en un puerto (útil para tests). */
@@ -21,6 +22,7 @@ export const createApp = () => {
   app.use('/api/users', userRoutes);
   app.use('/api/appointments', appointmentRoutes);
   app.use('/api/schedule', scheduleRoutes);
+  app.use('/api/psychologists', psychologistRoutes);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

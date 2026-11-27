@@ -10,7 +10,6 @@ Prioridad: 🔴 crítico · 🟠 importante · 🟡 menor.
 
 | # | Prio | Problema | Dónde |
 |---|---|---|---|
-| F8 | 🟠 | No hay **listado de psicólogos** para pacientes (solo el perfil público si ya se conoce el id) | rutas |
 | F12 | 🟡 | Crear horario compara `day` (medianoche) con ahora: imposible crear franjas para hoy | `scheduleController.createSchedule` |
 | F14 | 🟡 | Las horas se interpretan en UTC; sin gestión de zona horaria por usuario | `appointmentService`, `Schedule.hour` |
 | F16 | 🟡 | Borrar un usuario deja horarios y citas huérfanos | `userService.deleteUserService` |
@@ -54,6 +53,7 @@ Prioridad: 🔴 crítico · 🟠 importante · 🟡 menor.
 | F17 | Ids mal formados → 500 | 400 |
 | — | `@types/express@5` con Express 4, `ts-node-dev` en dependencies | Corregido |
 | — | Resend fallaba al arrancar sin API key | Cliente perezoso; sin key se avisa en consola |
+| F8 | Los pacientes no podían descubrir psicólogos | `GET /api/psychologists` con búsqueda por nombre, paginación y solo campos públicos |
 | — | Sin tests ni CI | Vitest + Supertest + MongoDB en memoria; workflow de GitHub Actions |
 | F1 | “Mis citas” siempre devolvía 403 (roles en inglés) y respondía dos veces | Roles `paciente`/`psicologo`, `asyncHandler`; el populate ya no expone contraseñas ni emails ajenos; ordenado por fecha |
 | F4 | Cancelar guardaba `'cancelled'` (fuera del enum) | Guarda `'cancelada'` con validación; migración de los datos antiguos al arrancar |
