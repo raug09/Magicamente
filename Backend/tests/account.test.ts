@@ -33,19 +33,27 @@ describe('GET /api/auth/me', () => {
   });
 });
 
-describe('POST /api/auth/register devuelve la sesión iniciada', () => {
-  it('incluye un token válido y el usuario', async () => {
+describe('POST /api/auth/register no devuelve sesión hasta confirmar el email', () => {
+  it('devuelve el usuario pendiente de confirmar, sin token', async () => {
     const res = await request(app)
       .post('/api/auth/register')
       .send({ name: 'Luis', email: 'luis@example.com', password: 'secreto123' });
 
     expect(res.status).toBe(201);
-    expect(res.body.user).toMatchObject({ name: 'Luis', email: 'luis@example.com', role: 'paciente' });
+    expect(res.body.token).toBeUndefined();
+    expect(res.body.user).toMatchObject({ name: 'Luis', email: 'luis@example.com', role: 'paciente', emailVerified: false });
     expect(res.body.user.password).toBeUndefined();
+  });
 
-    const me = await request(app).get('/api/auth/me').set({ Authorization: `Bearer ${res.body.token}` });
+  it('tras confirmar el email, el login devuelve un token que sirve en /auth/me', async () => {
+    await request(app).post('/api/auth/register').send({ name: 'Luis', email: 'luis@example.com', password: 'secreto123' });
+    await User.updateOne({ email: 'luis@example.com' }, { emailVerified: true });
+
+    const login = await request(app).post('/api/auth/login').send({ email: 'luis@example.com', password: 'secreto123' });
+    expect(login.status).toBe(200);
+    const me = await request(app).get('/api/auth/me').set({ Authorization: `Bearer ${login.body.token}` });
     expect(me.status).toBe(200);
-    expect(me.body._id).toBe(res.body.user._id);
+    expect(me.body.email).toBe('luis@example.com');
   });
 });
 
@@ -188,7 +196,9 @@ describe('zona horaria del usuario', () => {
     expect(res.status).toBe(201);
     expect(res.body.user.timezone).toBe('America/Bogota');
 
-    const me = await request(app).get('/api/auth/me').set({ Authorization: `Bearer ${res.body.token}` });
+    await User.updateOne({ email: 'luis@example.com' }, { emailVerified: true });
+    const login = await request(app).post('/api/auth/login').send({ email: 'luis@example.com', password: 'secreto123' });
+    const me = await request(app).get('/api/auth/me').set({ Authorization: `Bearer ${login.body.token}` });
     expect(me.body.timezone).toBe('America/Bogota');
   });
 

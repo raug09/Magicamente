@@ -166,3 +166,18 @@ Sin `RESEND_API_KEY` verás en consola `[email] RESEND_API_KEY no definido; no s
 | `409` al reservar | La franja ya está ocupada, o ya tienes otra cita a esa hora |
 | `400` al cancelar | La cita ya no está `pendiente` (ya cancelada o completada) |
 | `npm test` se queda descargando o falla con `fastdl.mongodb.org` | Sin acceso a internet o host bloqueado por la red |
+
+## Si la migración avisa de franjas duplicadas
+
+Al arrancar, la migración intenta crear el índice único de franjas (psicólogo + día + hora). Si ya hay duplicados de una versión anterior, no puede crearlo y lo registra como error (`no se pudo crear el índice único de franjas`). Para limpiarlos, en `mongosh` cuenta los grupos duplicados y borra las franjas sin citas:
+
+```js
+use magicamente
+db.schedules.aggregate([
+  { $group: { _id: { psychologist: "$psychologist", day: "$day", hour: "$hour" }, ids: { $push: "$_id" }, n: { $sum: 1 } } },
+  { $match: { n: { $gt: 1 } } }
+])
+```
+
+Revisa cada grupo antes de borrar: conserva la franja que tenga cita (`db.appointments.findOne({ scheduleId: <id> })`) y borra el resto. Luego reinicia el servidor.
+

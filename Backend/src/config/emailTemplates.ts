@@ -16,6 +16,14 @@ export const emailTemplates = {
       '<p>Si no fuiste tú, ignora este correo: tu contraseña no cambiará.</p>',
   }),
 
+  verifyEmail: (name: string, verifyLink: string) => ({
+    subject: 'Confirma tu correo',
+    html:
+      `<p>Hola ${escapeHtml(name)},</p>` +
+      `<p>Confirma tu correo para activar tu cuenta: <a href="${escapeHtml(verifyLink)}">confirmar correo</a>. ` +
+      'El enlace caduca en 24 horas y solo se puede usar una vez.</p>',
+  }),
+
   appointmentCancelled: (name: string, date: string, hour: string) => ({
     subject: 'Cita cancelada',
     html:

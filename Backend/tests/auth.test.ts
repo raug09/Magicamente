@@ -47,6 +47,7 @@ describe('POST /api/auth/register', () => {
 describe('POST /api/auth/login', () => {
   it('devuelve un JWT con id y rol', async () => {
     await register({ name: 'Ana', email: 'ana@example.com', password: 'secreto123', role: 'psicologo' });
+    await User.updateOne({ email: 'ana@example.com' }, { emailVerified: true });
     const res = await request(app).post('/api/auth/login').send({ email: 'ana@example.com', password: 'secreto123' });
 
     expect(res.status).toBe(200);

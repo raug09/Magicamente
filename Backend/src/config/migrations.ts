@@ -11,8 +11,11 @@ import { logger } from '../utils/logger';
  *  2. Sincroniza los índices de las citas: sustituye el índice único antiguo de `scheduleId`
  *     por el parcial (solo citas pendientes o completadas).
  *  3. Da zona horaria a los usuarios que no tenían (la de la aplicación, `APP_TIMEZONE`, por defecto UTC).
- *  4. Completa las franjas antiguas con `startsAt` y `timezone`. Hasta ahora todo se interpretaba en UTC,
- *     así que su instante real es día + hora en UTC.
+ *  4. Completa las franjas antiguas con `startsAt` y `timezone` (hasta ahora todo se interpretaba en UTC).
+ *  5. Da por verificadas las cuentas anteriores a la verificación de email, y por aprobados a los
+ *     psicólogos anteriores a la aprobación.
+ *  6. Crea el índice único de franjas (psicólogo + día + hora). Si ya hay duplicados, no se puede:
+ *     se registra un error y hay que limpiarlos a mano (ver docs/05-manual-de-uso.md).
  */
 export const runMigrations = async (): Promise<void> => {
   const fixed = await Appointment.updateMany({ state: 'cancelled' }, { $set: { state: 'cancelada' } });
@@ -21,9 +24,18 @@ export const runMigrations = async (): Promise<void> => {
   }
   await Appointment.syncIndexes();
 
-  const users = await User.updateMany({ timezone: { $exists: false } }, { $set: { timezone: getAppTimezone() } });
-  if (users.modifiedCount > 0) {
-    logger.info(`Migración: ${users.modifiedCount} usuario(s) con zona horaria ${getAppTimezone()}`);
+  const timezones = await User.updateMany({ timezone: { $exists: false } }, { $set: { timezone: getAppTimezone() } });
+  if (timezones.modifiedCount > 0) {
+    logger.info(`Migración: ${timezones.modifiedCount} usuario(s) con zona horaria ${getAppTimezone()}`);
+  }
+
+  const verified = await User.updateMany({ emailVerified: { $exists: false } }, { $set: { emailVerified: true } });
+  if (verified.modifiedCount > 0) {
+    logger.info(`Migración: ${verified.modifiedCount} cuenta(s) anteriores marcadas como verificadas`);
+  }
+  const approved = await User.updateMany({ approved: { $exists: false } }, { $set: { approved: true } });
+  if (approved.modifiedCount > 0) {
+    logger.info(`Migración: ${approved.modifiedCount} cuenta(s) anteriores marcadas como aprobadas`);
   }
 
   let migratedSchedules = 0;
@@ -47,5 +59,14 @@ export const runMigrations = async (): Promise<void> => {
   await flush();
   if (migratedSchedules > 0) {
     logger.info(`Migración: ${migratedSchedules} franja(s) con startsAt`);
+  }
+
+  try {
+    await Schedule.syncIndexes();
+  } catch (error) {
+    logger.error(
+      { err: error },
+      'Migración: no se pudo crear el índice único de franjas (¿hay franjas duplicadas?). Hay que limpiarlas a mano.'
+    );
   }
 };

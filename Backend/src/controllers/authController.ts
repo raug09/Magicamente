@@ -1,5 +1,12 @@
 import { Request, Response } from 'express';
-import { registerService, loginService, forgotPasswordService, resetPasswordService, signToken } from '../services/authService';
+import {
+  registerService,
+  loginService,
+  forgotPasswordService,
+  resetPasswordService,
+  verifyEmailService,
+  resendVerificationService,
+} from '../services/authService';
 import { getUserService } from '../services/userService';
 import { AppError } from '../utils/AppError';
 
@@ -7,10 +14,9 @@ import { AppError } from '../utils/AppError';
 
 export const register = async (req: Request, res: Response) => {
   const user = await registerService(req.body);
-  // Se devuelve la sesión ya iniciada: el frontend no necesita un login extra.
+  // No se devuelve sesión: antes hay que confirmar el email.
   res.status(201).json({
-    message: 'Usuario registrado correctamente',
-    token: signToken(user),
+    message: 'Usuario registrado. Revisa tu correo para confirmar la cuenta antes de iniciar sesión.',
     user: await getUserService(String(user._id)),
   });
 };
@@ -18,6 +24,17 @@ export const register = async (req: Request, res: Response) => {
 export const login = async (req: Request, res: Response) => {
   const token = await loginService(req.body.email, req.body.password);
   res.status(200).json({ token });
+};
+
+export const verifyEmail = async (req: Request, res: Response) => {
+  await verifyEmailService(req.body.token);
+  res.status(200).json({ message: 'Email confirmado. Ya puedes iniciar sesión.' });
+};
+
+/** Responde siempre lo mismo, exista o no la cuenta pendiente de confirmar. */
+export const resendVerification = async (req: Request, res: Response) => {
+  await resendVerificationService(req.body.email);
+  res.status(200).json({ message: 'Si la cuenta está pendiente de confirmar, recibirás un nuevo enlace.' });
 };
 
 /** Responde siempre lo mismo, exista o no el email, para no revelar qué cuentas están registradas. */

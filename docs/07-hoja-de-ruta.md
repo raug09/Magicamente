@@ -55,6 +55,21 @@ Las referencias (S1, F2…) apuntan a [06 · Problemas conocidos](06-problemas-c
 - [ ] ESLint + Prettier.
 - [ ] Documentación OpenAPI/Swagger.
 
+## ✅ Hecho: críticos (en curso de revisión)
+
+- Verificación de email al registrarse (enlace de 24 h, un solo uso, login bloqueado hasta confirmar).
+- Aprobación de psicólogos por un administrador (pueden entrar, pero no publicar ni aparecer hasta aprobarlos).
+- No se pueden cancelar citas cuya hora ya pasó.
+- Índice único de franjas (psicólogo + día + hora) en la base de datos.
+
+Pendiente de probar de extremo a extremo: los correos reales (hace falta `RESEND_API_KEY`).
+
+## Pendientes de producto
+
+- [ ] **Pago de las citas.** No existe ningún cobro. Hay que decidir: ¿quién cobra (la plataforma o el psicólogo)?, ¿cuándo (al reservar o antes de la cita)?, ¿qué pasa con cancelaciones y reembolsos?, ¿qué pasarela (Stripe, MercadoPago, Wompi u otra) y en qué países?, ¿comisión de la plataforma?
+- [ ] ¿Quién aprueba a los psicólogos y con qué criterios (títulos, licencia)? Hoy lo hace un administrador a mano.
+- [ ] ¿Se notifica al psicólogo cuando lo aprueban o lo rechazan?
+
 ## Frontend
 
 Todo lo que necesita quien lo construya, y su lista de pendientes, está en [08 · Guía para el frontend](08-guia-frontend.md).

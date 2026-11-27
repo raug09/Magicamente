@@ -15,6 +15,7 @@ const PUBLIC_FIELDS = 'name studies description';
 export const listPsychologists = async ({ q, page, limit }: ListPsychologistsOptions) => {
   const filter: Record<string, unknown> = {
     role: 'psicologo',
+    approved: { $ne: false }, // los psicólogos pendientes de aprobación no aparecen
     isActive: { $ne: false }, // los desactivados no aparecen
   };
   if (q) {

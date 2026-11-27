@@ -80,6 +80,7 @@ describe('emails normalizados (minúsculas y sin espacios)', () => {
     const res = await register({ ...valid, email: '  Ana@Example.COM ' });
     expect(res.status).toBe(201);
     expect(res.body.user.email).toBe('ana@example.com');
+    await User.updateOne({ email: 'ana@example.com' }, { emailVerified: true });
 
     for (const email of ['ana@example.com', 'ANA@EXAMPLE.COM', ' Ana@example.com ']) {
       const login = await request(app).post('/api/auth/login').send({ email, password: 'secreto123' });

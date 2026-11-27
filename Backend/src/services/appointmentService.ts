@@ -38,7 +38,7 @@ export const scheduleAppointment = async ({ patientId, scheduleId }: { patientId
   if (!schedule.isAvailable) {
     throw new AppError(409, 'Este horario ya está ocupado.');
   }
-  const psychologist = await User.findOne({ _id: schedule.psychologist, isActive: { $ne: false }, deletedAt: null });
+  const psychologist = await User.findOne({ _id: schedule.psychologist, approved: { $ne: false }, isActive: { $ne: false }, deletedAt: null });
   if (!psychologist) {
     throw new AppError(409, 'El psicólogo ya no está disponible.');
   }
@@ -104,6 +104,9 @@ export const completeAppointment = async (appointmentId: string, user: AuthUser)
 /** Cancela una cita pendiente y libera su franja. */
 export const cancelAppointment = async (appointmentId: string, user: AuthUser) => {
   const owned = await getOwnedAppointment(appointmentId, user);
+  if (owned.state === 'pendiente' && owned.time <= new Date()) {
+    throw new AppError(400, 'No puedes cancelar una cita que ya ha pasado.');
+  }
 
   // Condicionado a 'pendiente': cancelar dos veces no debe liberar una franja ya reservada de nuevo.
   const appointment = await Appointment.findOneAndUpdate(

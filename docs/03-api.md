@@ -15,6 +15,8 @@ Leyenda: ✅ funciona · ⚠️ funciona con salvedades · ❌ roto (detalles en
 | POST | `/api/auth/register` | todos | Registro (paciente o psicólogo) | ✅ |
 | POST | `/api/auth/login` | todos | Login, devuelve JWT | ✅ |
 | GET | `/api/auth/me` | 🔒 | Usuario de la sesión actual | ✅ |
+| POST | `/api/auth/verify-email` | todos | Confirma el email con el enlace del correo | ✅ |
+| POST | `/api/auth/resend-verification` | todos | Pide un nuevo enlace de confirmación | ✅ |
 | POST | `/api/auth/forgot-password` | todos | Pide un enlace para restablecer la contraseña | ✅ |
 | POST | `/api/auth/reset-password` | todos | Cambia la contraseña con el token del enlace | ✅ |
 | GET | `/api/users` | 🔒 admin | Listar usuarios | ✅ |
@@ -59,7 +61,8 @@ Los antiguos `POST /api/email/send-test` y `GET /api/notifications/test` se **el
 - `name`, `email`, `password` obligatorios → si faltan, `400`. `studies` debe ser una lista de textos.
 - Email ya usado → `409`.
 - Tras guardar intenta enviar el correo `confirmation`; si falla, solo lo registra en el log.
-- `201 { "message": "Usuario registrado correctamente", "token": "…", "user": {…} }`: devuelve la sesión ya iniciada (mismo token que daría el login), así no hace falta un login extra.
+- `201 { "message": "Usuario registrado…", "user": {…} }`. **No devuelve token**: el usuario queda con `emailVerified: false` y recibe un correo con el enlace de confirmación. Hasta confirmarlo, el login responde `403`.
+- Los psicólogos quedan con `approved: false` hasta que un administrador los aprueba (ver `PUT /api/users/:id`).
 
 ### `POST /api/auth/login`
 
@@ -171,7 +174,7 @@ Como administrador hay que añadir `"psychologist": "<idPsicologo>"`.
 
 - Psicólogo que indica otro `psychologist` → `403`. Paciente → `403`.
 - `400` si `day`/`hour` no tienen el formato correcto, si la franja ya ha empezado (se puede crear para hoy si aún no ha empezado), si `repeatWeeks` no es válido, o si esa hora **no existe** por un cambio de hora (en ese caso no se crea ninguna).
-- El destinatario no es psicólogo (o está desactivado) → `404`. Si **todas** las franjas ya existían → `409`.
+- El destinatario no es psicólogo (o está desactivado) → `404`. Un psicólogo **pendiente de aprobación** → `403` (“Tu cuenta de psicólogo está pendiente de aprobación”). Si **todas** las franjas ya existían → `409`.
 - `201 { "message": "Horario creado exitosamente", "schedules": [{...}], "skipped": ["2027-01-05"] }` (siempre una lista, aunque sea de una franja).
 - Cada franja: `_id`, `psychologist`, `day` (día del calendario del psicólogo, medianoche UTC), `hour`, `timezone`, `startsAt` (instante real, UTC), `isAvailable`, `createdAt`.
 
@@ -249,7 +252,7 @@ Devuelve **tus** citas ordenadas por fecha, con la franja (`scheduleId`) incluid
 Sin body. Pasa la cita a `cancelada` y libera la franja.
 
 - `200 { "message": "Cita cancelada correctamente", "appointment": {...} }`.
-- `400` si la cita no está `pendiente` (ya cancelada o completada) · `403` si no es tu cita · `404` si no existe.
+- `400` si la cita no está `pendiente` (ya cancelada o completada), o si **su hora ya pasó** · `403` si no es tu cita · `404` si no existe.
 
 ### `PATCH /api/appointments/appointment/update/:id` 🔒 psicólogo de la cita o admin
 

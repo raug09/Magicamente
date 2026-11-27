@@ -15,11 +15,11 @@ Documento pensado para quien construya el frontend (persona o sesión de Claude)
 
 ## 2. Sesión y autenticación
 
-1. `POST /api/auth/login` → `{ "token": "<jwt>" }`.
+1. `POST /api/auth/login` → `{ "token": "<jwt>" }`. Responde `403` si el email aún no está confirmado (ver §5).
 2. Enviar `Authorization: Bearer <token>` en toda petición protegida.
 3. El token **dura 1 hora y no hay refresh token**: pasada la hora hay que volver a iniciar sesión.
 4. **`GET /api/auth/me`** devuelve el usuario de la sesión (`_id`, `name`, `email`, `role`, `studies`, `description`, `isActive`, `createdAt`). Llámalo al arrancar la app si hay un token guardado: si responde `401`, la sesión no vale; si responde `200`, ya tienes el usuario y su rol. **No decodifiques el JWT en el cliente.**
-5. El registro (`POST /api/auth/register`) **ya devuelve la sesión iniciada**: `{ message, token, user }`. No hace falta un login extra.
+5. El registro (`POST /api/auth/register`) **ya no devuelve sesión**: hay que confirmar el email primero. Tras el registro, muestra “revisa tu correo” y ofrece reenviar el enlace.
 
 ### Cuándo se invalida la sesión (siempre `401`)
 
@@ -132,7 +132,7 @@ GET /api/appointments/appointment
 
 ```http
 PATCH /api/appointments/appointment/cancel/:id         → 200 { "message", "appointment" }
-   400 si la cita no está pendiente (ya cancelada o completada) · 403 si no es tuya · 404
+   400 si la cita no está pendiente (ya cancelada o completada) o si su hora ya pasó · 403 si no es tuya · 404
 
 PATCH /api/appointments/appointment/update/:id  { "state": "completada" }   (solo el psicólogo de la cita)
    400 si aún no ha ocurrido, o no está pendiente · 403 si no eres su psicólogo

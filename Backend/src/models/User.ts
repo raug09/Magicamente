@@ -8,10 +8,10 @@ export interface IUser extends Document {
   password: string;
   role: 'paciente' | 'psicologo' | 'administrador';
   isActive?: boolean;
-  studies?: string[];             
+  studies?: string[];
   description?: string;
   createdAt: Date;
-  schedules?: Types.ObjectId[];   
+  schedules?: Types.ObjectId[];
   /** SHA-256 del token de recuperación enviado por correo (nunca el token en claro). */
   passwordResetTokenHash?: string;
   passwordResetExpires?: Date;
@@ -19,8 +19,15 @@ export interface IUser extends Document {
   passwordChangedAt?: Date;
   /** Fecha en que se eliminó la cuenta. Los datos personales se anonimizan, pero el registro se conserva. */
   deletedAt?: Date;
-  /** Zona horaria IANA del usuario (p. ej. "America/Bogota"): define cómo se ven y se crean sus horas. */
+  /** Zona horaria IANA del usuario (p. ej. "America/Bogota"). */
   timezone?: string;
+  /** false hasta que el usuario confirma su email. Las cuentas anteriores a esta función se migran a true. */
+  emailVerified?: boolean;
+  emailVerificationTokenHash?: string;
+  emailVerificationExpires?: Date;
+  emailVerificationSentAt?: Date;
+  /** Los psicólogos empiezan sin aprobar: un administrador los aprueba. Los demás roles siempre están aprobados. */
+  approved?: boolean;
 }
 
 const UserSchema = new Schema<IUser>({
@@ -29,7 +36,7 @@ const UserSchema = new Schema<IUser>({
   password: { type: String, required: true },
   role: { type: String, enum: ['paciente', 'psicologo', 'administrador'], default: 'paciente' },
   isActive: { type: Boolean, default: true },
-  studies: { type: [String], default: [] },  
+  studies: { type: [String], default: [] },
   description: { type: String },
   createdAt: { type: Date, default: Date.now },
   schedules: [{ type: Schema.Types.ObjectId, ref: 'Schedule' }],
@@ -37,7 +44,21 @@ const UserSchema = new Schema<IUser>({
   passwordResetExpires: { type: Date, select: false },
   passwordChangedAt: { type: Date, select: false },
   deletedAt: { type: Date },
-  timezone: { type: String, default: () => getAppTimezone(), validate: { validator: isValidTimeZone, message: 'Zona horaria no válida' } },
+  timezone: {
+    type: String,
+    default: () => getAppTimezone(),
+    validate: { validator: isValidTimeZone, message: 'Zona horaria no válida' },
+  },
+  emailVerified: { type: Boolean, default: false },
+  emailVerificationTokenHash: { type: String, select: false },
+  emailVerificationExpires: { type: Date, select: false },
+  emailVerificationSentAt: { type: Date, select: false },
+  approved: {
+    type: Boolean,
+    default: function (this: { role?: string }) {
+      return this.role !== 'psicologo';
+    },
+  },
 });
 
 export default model<IUser>('User', UserSchema);

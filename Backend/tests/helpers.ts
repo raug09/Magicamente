@@ -20,7 +20,14 @@ let counter = 0;
 export const createUser = async (role: Role, password = 'secreto123'): Promise<TestUser> => {
   counter++;
   const email = `${role}${counter}@example.com`;
-  const user = await User.create({ name: `${role} ${counter}`, email, password: await hashPassword(password), role });
+  const user = await User.create({
+    name: `${role} ${counter}`,
+    email,
+    password: await hashPassword(password),
+    role,
+    emailVerified: true,
+    approved: true,
+  });
   const token = jwt.sign({ id: user._id, role }, process.env.JWT_SECRET!, { expiresIn: '1h' });
   return { id: String(user._id), token, email };
 };

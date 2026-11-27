@@ -59,6 +59,10 @@ export const loginSchema = z.object({ email: emailField, password: passwordField
 
 export const forgotPasswordSchema = z.object({ email: emailField });
 
+export const verifyEmailSchema = z.object({ token: text('token', 200) });
+
+export const resendVerificationSchema = z.object({ email: emailField });
+
 export const resetPasswordSchema = z.object({
   token: text('token', 200),
   password: passwordField,
@@ -80,6 +84,7 @@ export const updateUserSchema = z
     email: validEmail.optional(),
     role: z.enum(ROLES, { errorMap: () => ({ message: `role debe ser uno de: ${ROLES.join(', ')}` }) }).optional(),
     isActive: z.boolean({ invalid_type_error: 'isActive debe ser true o false' }).optional(),
+    approved: z.boolean({ invalid_type_error: 'approved debe ser true o false' }).optional(),
   })
   .passthrough();
 

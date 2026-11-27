@@ -45,6 +45,9 @@ export const createSchedules = async ({ psychologist, day, hour, repeatWeeks = 1
   if (!psychologistUser) {
     throw new AppError(404, 'Psicólogo no encontrado');
   }
+  if (psychologistUser.approved === false) {
+    throw new AppError(403, 'Tu cuenta de psicólogo está pendiente de aprobación');
+  }
   const timezone = timezoneOf(psychologistUser);
 
   // Se calculan todas antes de crear ninguna: si una cae en un cambio de hora, no se crea nada.
@@ -61,7 +64,13 @@ export const createSchedules = async ({ psychologist, day, hour, repeatWeeks = 1
       skipped.push(occurrence.day);
       continue;
     }
-    schedules.push(await Schedule.create({ psychologist, day: dayDate, hour, timezone, startsAt: occurrence.startsAt }));
+    try {
+      schedules.push(await Schedule.create({ psychologist, day: dayDate, hour, timezone, startsAt: occurrence.startsAt }));
+    } catch (error) {
+      // Dos peticiones simultáneas: la base de datos rechaza la segunda (índice único).
+      if ((error as { code?: number }).code !== 11000) throw error;
+      skipped.push(occurrence.day);
+    }
   }
 
   if (schedules.length === 0) {

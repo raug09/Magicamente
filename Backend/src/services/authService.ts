@@ -22,6 +22,9 @@ export const hashPassword = async (password: string): Promise<string> => {
   return bcrypt.hash(password, salt);
 };
 
+const hashToken = (token: string): string => crypto.createHash('sha256').update(token).digest('hex');
+const newToken = (): string => crypto.randomBytes(32).toString('hex');
+
 export interface RegisterInput {
   name: string;
   email: string;
@@ -30,6 +33,29 @@ export interface RegisterInput {
   studies?: string[];
   timezone?: string;
 }
+
+// --- Verificación de email -------------------------------------------------------------------
+
+export const EMAIL_VERIFICATION_TTL_MS = 24 * 60 * 60 * 1000; // el enlace caduca en 24 horas
+export const EMAIL_VERIFICATION_RESEND_COOLDOWN_MS = 60 * 1000; // como mucho un correo por minuto y cuenta
+
+/** Crea un enlace de verificación nuevo (invalida el anterior) y lo envía en segundo plano. */
+const issueEmailVerification = async (userId: unknown, email: string, name: string): Promise<void> => {
+  const token = newToken();
+  const now = new Date();
+  await User.updateOne(
+    { _id: userId },
+    {
+      emailVerificationTokenHash: hashToken(token),
+      emailVerificationExpires: new Date(now.getTime() + EMAIL_VERIFICATION_TTL_MS),
+      emailVerificationSentAt: now,
+    }
+  );
+  const verifyLink = `${getFrontendUrl()}/verify-email?token=${token}`;
+  sendEmail('verifyEmail', email, name, verifyLink).catch((error) => {
+    logger.error({ err: error }, 'Error al enviar el correo de verificación');
+  });
+};
 
 export const registerService = async ({ name, email, password, role = 'paciente', studies, timezone }: RegisterInput): Promise<IUser> => {
   if (!SELF_REGISTER_ROLES.includes(role)) {
@@ -52,25 +78,52 @@ export const registerService = async ({ name, email, password, role = 'paciente'
     ...(timezone !== undefined && { timezone }),
   });
   await newUser.save();
-
-  try {
-    await sendEmail('confirmation', email, name);
-  } catch (error) {
-    // El usuario ya está guardado: un fallo de correo no debe romper el registro.
-    logger.error({ err: error }, 'Error al enviar email de confirmación');
-  }
+  await issueEmailVerification(newUser._id, newUser.email, newUser.name);
 
   return newUser;
 };
+
+/** Confirma el email con un token válido, no caducado y sin usar. El token se consume. */
+export const verifyEmailService = async (token: string): Promise<void> => {
+  const user = await User.findOneAndUpdate(
+    { emailVerificationTokenHash: hashToken(token), emailVerificationExpires: { $gt: new Date() }, isActive: { $ne: false } },
+    {
+      emailVerified: true,
+      $unset: { emailVerificationTokenHash: '', emailVerificationExpires: '', emailVerificationSentAt: '' },
+    }
+  );
+  if (!user) {
+    throw new AppError(400, 'El enlace no es válido o ha caducado');
+  }
+};
+
+/**
+ * Reenvía el enlace de verificación. Responde igual exista o no la cuenta, y no hace nada si ya está
+ * verificada o si se envió hace menos de un minuto.
+ */
+export const resendVerificationService = async (email: string): Promise<void> => {
+  const user = await User.findOne({ email }).select('+emailVerificationSentAt');
+  if (!user || user.emailVerified !== false || user.isActive === false) return;
+
+  const lastSentAt = user.emailVerificationSentAt?.getTime() ?? 0;
+  if (Date.now() - lastSentAt < EMAIL_VERIFICATION_RESEND_COOLDOWN_MS) return;
+
+  await issueEmailVerification(user._id, user.email, user.name);
+};
+
+// --- Registro, login y sesión ----------------------------------------------------------------
 
 export const loginService = async (email: string, password: string): Promise<string> => {
   const user = await User.findOne({ email });
   if (!user || !(await bcrypt.compare(password, user.password))) {
     throw new AppError(401, 'Credenciales inválidas');
   }
-  // Solo se revela tras acertar la contraseña, para no delatar qué cuentas existen.
+  // Solo se revelan estos motivos tras acertar la contraseña, para no delatar qué cuentas existen.
   if (user.isActive === false) {
     throw new AppError(403, 'Cuenta desactivada');
+  }
+  if (user.emailVerified === false) {
+    throw new AppError(403, 'Debes confirmar tu email antes de iniciar sesión. Revisa tu correo.');
   }
 
   return signToken(user);
@@ -80,8 +133,6 @@ export const loginService = async (email: string, password: string): Promise<str
 
 export const RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // el enlace caduca en 1 hora
 export const RESET_REQUEST_COOLDOWN_MS = 60 * 1000; // como mucho un correo por minuto y cuenta
-
-const hashToken = (token: string): string => crypto.createHash('sha256').update(token).digest('hex');
 
 /**
  * Genera un token de un solo uso y lo envía por correo. En la base de datos solo se guarda su hash.
@@ -96,7 +147,7 @@ export const forgotPasswordService = async (email: string): Promise<void> => {
   const lastRequestAt = user.passwordResetExpires ? user.passwordResetExpires.getTime() - RESET_TOKEN_TTL_MS : 0;
   if (now - lastRequestAt < RESET_REQUEST_COOLDOWN_MS) return;
 
-  const token = crypto.randomBytes(32).toString('hex');
+  const token = newToken();
   await User.updateOne(
     { _id: user._id },
     { passwordResetTokenHash: hashToken(token), passwordResetExpires: new Date(now + RESET_TOKEN_TTL_MS) }
