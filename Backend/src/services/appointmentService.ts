@@ -15,8 +15,7 @@ export const getOwnedAppointment = async (appointmentId: string, user: AuthUser)
   if (!appointment) {
     throw new AppError(404, 'La cita no existe.');
   }
-  const isParticipant =
-    appointment.patientId.toString() === user.id || appointment.psychologistId.toString() === user.id;
+  const isParticipant = appointment.patientId.toString() === user.id || appointment.psychologistId.toString() === user.id;
   if (user.role !== 'administrador' && !isParticipant) {
     throw new AppError(403, 'No tienes permiso sobre esta cita.');
   }
@@ -39,7 +38,12 @@ export const scheduleAppointment = async ({ patientId, scheduleId }: { patientId
   if (!schedule.isAvailable) {
     throw new AppError(409, 'Este horario ya está ocupado.');
   }
-  const psychologist = await User.findOne({ _id: schedule.psychologist, approved: { $ne: false }, isActive: { $ne: false }, deletedAt: null });
+  const psychologist = await User.findOne({
+    _id: schedule.psychologist,
+    approved: { $ne: false },
+    isActive: { $ne: false },
+    deletedAt: null,
+  });
   if (!psychologist) {
     throw new AppError(409, 'El psicólogo ya no está disponible.');
   }

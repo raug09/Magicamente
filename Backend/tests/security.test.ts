@@ -14,7 +14,9 @@ const oldToken = async (user: TestUser, role = 'paciente'): Promise<string> => {
   // Sesión creada, pero el token lleva una fecha de emisión de hace un minuto.
   const token = await sessionToken(user.id, role as 'paciente');
   const payload = jwt.decode(token) as { jti: string };
-  return jwt.sign({ id: user.id, role, jti: payload.jti, iat: Math.floor(Date.now() / 1000) - 60 }, process.env.JWT_SECRET!, { expiresIn: '1h' });
+  return jwt.sign({ id: user.id, role, jti: payload.jti, iat: Math.floor(Date.now() / 1000) - 60 }, process.env.JWT_SECRET!, {
+    expiresIn: '1h',
+  });
 };
 const bearer = (token: string) => ({ Authorization: `Bearer ${token}` });
 const me = (token: string) => request(app).get('/api/appointments/appointment').set(bearer(token)); // 200 para pacientes
@@ -45,7 +47,14 @@ describe('sesiones: el token se valida contra la base de datos', () => {
 
     // el administrador lo degrada a paciente; su token (con rol psicologo) deja de dar permisos de psicólogo
     await User.updateOne({ _id: psychologist.id }, { role: 'paciente' });
-    expect((await request(app).post('/api/schedule').set(auth(psychologist)).send({ ...body, hour: '11:00' })).status).toBe(403);
+    expect(
+      (
+        await request(app)
+          .post('/api/schedule')
+          .set(auth(psychologist))
+          .send({ ...body, hour: '11:00' })
+      ).status
+    ).toBe(403);
 
     // y al revés: un token de paciente no sirve para hacerse administrador
     const patient = await createUser('paciente');
@@ -166,12 +175,20 @@ describe('límite de intentos por IP', () => {
   it('forgot-password, registro y reset-password comparten un límite de 10 por hora', async () => {
     const server = limited();
     for (let i = 0; i < 10; i++) {
-      expect((await request(server).post('/api/auth/forgot-password').send({ email: `u${i}@example.com` })).status).toBe(200);
+      expect(
+        (
+          await request(server)
+            .post('/api/auth/forgot-password')
+            .send({ email: `u${i}@example.com` })
+        ).status
+      ).toBe(200);
     }
     expect((await request(server).post('/api/auth/forgot-password').send({ email: 'otro@example.com' })).status).toBe(429);
     // el contador es común a las tres rutas: ya no se puede registrar ni usar reset-password
     expect((await request(server).post('/api/auth/reset-password').send({ token: 'x', password: 'clave-valida-123' })).status).toBe(429);
-    expect((await request(server).post('/api/auth/register').send({ name: 'A', email: 'a@example.com', password: 'clave-valida-123' })).status).toBe(429);
+    expect(
+      (await request(server).post('/api/auth/register').send({ name: 'A', email: 'a@example.com', password: 'clave-valida-123' })).status
+    ).toBe(429);
     // pero login y el resto de la API tienen los suyos
     expect((await request(server).post('/api/auth/login').send({ email: 'a@example.com', password: 'incorrecta' })).status).toBe(401);
   });
@@ -220,12 +237,16 @@ describe('cabeceras de seguridad y CORS', () => {
     expect((await request(server).get('/').set('Origin', 'https://b.example.com')).headers['access-control-allow-origin']).toBe(
       'https://b.example.com'
     );
-    expect((await request(server).get('/').set('Origin', 'https://app.magicamente.online')).headers['access-control-allow-origin']).toBeUndefined();
+    expect(
+      (await request(server).get('/').set('Origin', 'https://app.magicamente.online')).headers['access-control-allow-origin']
+    ).toBeUndefined();
   });
 
   it('CORS_ORIGIN=* lo abre a cualquiera', async () => {
     process.env.CORS_ORIGIN = '*';
-    const res = await request(createApp({ rateLimit: false })).get('/').set('Origin', 'https://cualquiera.example.com');
+    const res = await request(createApp({ rateLimit: false }))
+      .get('/')
+      .set('Origin', 'https://cualquiera.example.com');
     expect(res.headers['access-control-allow-origin']).toBeTruthy();
   });
 });

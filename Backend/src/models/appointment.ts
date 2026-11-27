@@ -36,9 +36,6 @@ appointmentSchema.index({ state: 1, reminderSent: 1, time: 1 });
 
 // Una franja solo puede tener UNA cita viva (pendiente o completada). Las canceladas no cuentan,
 // así que una franja cancelada se puede volver a reservar.
-appointmentSchema.index(
-  { scheduleId: 1 },
-  { unique: true, partialFilterExpression: { state: { $in: ['pendiente', 'completada'] } } }
-);
+appointmentSchema.index({ scheduleId: 1 }, { unique: true, partialFilterExpression: { state: { $in: ['pendiente', 'completada'] } } });
 
 export default mongoose.model<IAppointment>('Appointment', appointmentSchema);

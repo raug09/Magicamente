@@ -189,7 +189,9 @@ describe('recuperación de contraseña', () => {
     await forgot(user.email);
     await tokenFromEmail();
 
-    const res = await request(app).get(`/api/users/${user.id}`).set({ Authorization: `Bearer ${user.token}` });
+    const res = await request(app)
+      .get(`/api/users/${user.id}`)
+      .set({ Authorization: `Bearer ${user.token}` });
     expect(res.status).toBe(200);
     expect(res.body.passwordResetTokenHash).toBeUndefined();
     expect(res.body.passwordResetExpires).toBeUndefined();

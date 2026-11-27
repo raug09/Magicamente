@@ -2,8 +2,7 @@ import { describe, expect, it } from 'vitest';
 import User from '../src/models/User';
 import { app, auth, createUser, request } from './helpers';
 
-const list = (user: Parameters<typeof auth>[0], query = '') =>
-  request(app).get(`/api/psychologists${query}`).set(auth(user));
+const list = (user: Parameters<typeof auth>[0], query = '') => request(app).get(`/api/psychologists${query}`).set(auth(user));
 
 const createPsychologist = async (name: string, extra: object = {}) => {
   const user = await createUser('psicologo');
@@ -51,11 +50,7 @@ describe('GET /api/psychologists', () => {
     await createPsychologist('Beatriz Ruiz');
 
     const all = await list(patient);
-    expect(all.body.items.map((p: { name: string }) => p.name)).toEqual([
-      'Ana Pérez',
-      'Beatriz Ruiz',
-      'Carlos Ruiz',
-    ]);
+    expect(all.body.items.map((p: { name: string }) => p.name)).toEqual(['Ana Pérez', 'Beatriz Ruiz', 'Carlos Ruiz']);
 
     const found = await list(patient, '?q=ruiz');
     expect(found.body.total).toBe(2);

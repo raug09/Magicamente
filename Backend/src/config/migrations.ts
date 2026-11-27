@@ -47,7 +47,9 @@ export const runMigrations = async (): Promise<void> => {
     { $set: { verificationStatus: 'pendiente' } }
   );
   if (approvedPsychologists.modifiedCount + pendingPsychologists.modifiedCount > 0) {
-    logger.info(`Migración: estado de verificación asignado a ${approvedPsychologists.modifiedCount + pendingPsychologists.modifiedCount} psicólogo(s)`);
+    logger.info(
+      `Migración: estado de verificación asignado a ${approvedPsychologists.modifiedCount + pendingPsychologists.modifiedCount} psicólogo(s)`
+    );
   }
 
   let migratedSchedules = 0;
@@ -59,7 +61,9 @@ export const runMigrations = async (): Promise<void> => {
       batch = [];
     }
   };
-  for await (const schedule of Schedule.find({ startsAt: { $exists: false } }).lean().cursor()) {
+  for await (const schedule of Schedule.find({ startsAt: { $exists: false } })
+    .lean()
+    .cursor()) {
     batch.push({
       updateOne: {
         filter: { _id: schedule._id },

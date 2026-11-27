@@ -38,7 +38,13 @@ describe('migraciones', () => {
 
   it('completa franjas antiguas con startsAt (día + hora en UTC) y timezone', async () => {
     const id = new mongoose.Types.ObjectId();
-    await Schedule.collection.insertOne({ psychologist: id, day: new Date('2026-12-15'), hour: '10:30', isAvailable: true, recurrent: false });
+    await Schedule.collection.insertOne({
+      psychologist: id,
+      day: new Date('2026-12-15'),
+      hour: '10:30',
+      isAvailable: true,
+      recurrent: false,
+    });
 
     await runMigrations();
     await runMigrations();

@@ -153,14 +153,16 @@ describe('GET /api/schedule/:psychologistId (filtros)', () => {
 describe('PUT y DELETE /api/schedule/:id', () => {
   const put = (user: Parameters<typeof auth>[0], id: string, body: object) =>
     request(app).put(`/api/schedule/${id}`).set(auth(user)).send(body);
-  const del = (user: Parameters<typeof auth>[0], id: string) =>
-    request(app).delete(`/api/schedule/${id}`).set(auth(user));
+  const del = (user: Parameters<typeof auth>[0], id: string) => request(app).delete(`/api/schedule/${id}`).set(auth(user));
 
   const setup = async () => {
     const psychologist = await createUser('psicologo');
     const other = await createUser('psicologo');
     const patient = await createUser('paciente');
-    const create = await request(app).post('/api/schedule').set(auth(psychologist)).send({ day: futureDay(10), hour: '10:00' });
+    const create = await request(app)
+      .post('/api/schedule')
+      .set(auth(psychologist))
+      .send({ day: futureDay(10), hour: '10:00' });
     return { psychologist, other, patient, id: create.body.schedules[0]._id as string };
   };
 
@@ -203,17 +205,17 @@ describe('PUT y DELETE /api/schedule/:id', () => {
 
   it('no permite chocar con otra franja del mismo psicólogo', async () => {
     const { psychologist, id } = await setup();
-    await request(app).post('/api/schedule').set(auth(psychologist)).send({ day: futureDay(10), hour: '15:00' });
+    await request(app)
+      .post('/api/schedule')
+      .set(auth(psychologist))
+      .send({ day: futureDay(10), hour: '15:00' });
     expect((await put(psychologist, id, { hour: '15:00' })).status).toBe(409);
     expect((await put(psychologist, id, { hour: '10:00' })).status).toBe(200); // sin cambios reales
   });
 
   it('una franja con cita reservada no se puede modificar ni borrar', async () => {
     const { psychologist, patient, id } = await setup();
-    const booked = await request(app)
-      .post('/api/appointments/appointment')
-      .set(auth(patient))
-      .send({ scheduleId: id });
+    const booked = await request(app).post('/api/appointments/appointment').set(auth(patient)).send({ scheduleId: id });
     expect(booked.status).toBe(201);
 
     expect((await put(psychologist, id, { hour: '12:00' })).status).toBe(409);
@@ -249,8 +251,7 @@ describe('zona horaria del psicólogo', () => {
     const patient = await createUser('paciente');
     return { psychologist, patient };
   };
-  const create = (user: Parameters<typeof auth>[0], body: object) =>
-    request(app).post('/api/schedule').set(auth(user)).send(body);
+  const create = (user: Parameters<typeof auth>[0], body: object) => request(app).post('/api/schedule').set(auth(user)).send(body);
 
   it('day y hour se interpretan en la zona del psicólogo y se guarda el instante real', async () => {
     const { psychologist } = await setup('America/Bogota');
@@ -318,8 +319,7 @@ describe('zona horaria del psicólogo', () => {
 });
 
 describe('franjas recurrentes (repeatWeeks)', () => {
-  const create = (user: Parameters<typeof auth>[0], body: object) =>
-    request(app).post('/api/schedule').set(auth(user)).send(body);
+  const create = (user: Parameters<typeof auth>[0], body: object) => request(app).post('/api/schedule').set(auth(user)).send(body);
 
   it('crea una franja por semana a la misma hora', async () => {
     const psychologist = await createUser('psicologo');

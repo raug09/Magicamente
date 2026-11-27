@@ -25,7 +25,9 @@ const documentedRoutes = () =>
 describe('documentación OpenAPI', () => {
   it('documenta todas las rutas de la API, y solo las que existen', () => {
     const express = expressRoutes().sort();
-    const documented = documentedRoutes().filter((route) => route !== 'get /health').sort();
+    const documented = documentedRoutes()
+      .filter((route) => route !== 'get /health')
+      .sort();
     expect(express.length).toBeGreaterThan(20);
     expect(documented).toEqual(express);
   });

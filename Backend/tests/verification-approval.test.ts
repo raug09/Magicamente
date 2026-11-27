@@ -137,7 +137,12 @@ describe('verificación de psicólogos', () => {
           key,
           status: 'pendiente',
           note: '',
-          file: { storageKey: `verification/${psychologist.id}/${key}/seed.pdf`, contentType: 'application/pdf', size: 10, uploadedAt: new Date() },
+          file: {
+            storageKey: `verification/${psychologist.id}/${key}/seed.pdf`,
+            contentType: 'application/pdf',
+            size: 10,
+            uploadedAt: new Date(),
+          },
         })),
       }
     );
@@ -167,7 +172,10 @@ describe('verificación de psicólogos', () => {
   it('un psicólogo pendiente puede iniciar sesión pero no publicar franjas', async () => {
     const psychologist = await pendingPsychologist();
     expect((await login(psychologist.email)).status).toBe(200);
-    const res = await request(app).post('/api/schedule').set(auth(psychologist)).send({ day: futureDay(10), hour: '10:00' });
+    const res = await request(app)
+      .post('/api/schedule')
+      .set(auth(psychologist))
+      .send({ day: futureDay(10), hour: '10:00' });
     expect(res.status).toBe(403);
     expect(res.body.message).toMatch(/pendiente de aprobación/);
   });
@@ -179,7 +187,10 @@ describe('verificación de psicólogos', () => {
 
     const list = await request(app).get('/api/psychologists').set(auth(patient));
     expect(list.body.total).toBe(0);
-    const booked = await request(app).post('/api/appointments/appointment').set(auth(patient)).send({ scheduleId: String(schedule._id) });
+    const booked = await request(app)
+      .post('/api/appointments/appointment')
+      .set(auth(patient))
+      .send({ scheduleId: String(schedule._id) });
     expect(booked.status).toBe(409);
   });
 
@@ -215,7 +226,10 @@ describe('verificación de psicólogos', () => {
     expect(res.status).toBe(200);
     expect(res.body.verificationStatus).toBe('aprobado');
 
-    const created = await request(app).post('/api/schedule').set(auth(psychologist)).send({ day: futureDay(10), hour: '10:00' });
+    const created = await request(app)
+      .post('/api/schedule')
+      .set(auth(psychologist))
+      .send({ day: futureDay(10), hour: '10:00' });
     expect(created.status).toBe(201);
     await vi.waitFor(() => expect(sentTo('verificationApproved', psychologist.email)).toHaveLength(1));
   });
@@ -283,15 +297,24 @@ describe('verificación de psicólogos', () => {
   it('el psicólogo rechazado ve su motivo en /auth/me y no puede publicar (mensaje propio)', async () => {
     const admin = await createUser('administrador');
     const psychologist = await pendingPsychologist();
-    await verify(admin, psychologist.id, { status: 'rechazado', message: 'Falta la cédula', documents: [{ key: 'cedula', status: 'rechazado' }] });
+    await verify(admin, psychologist.id, {
+      status: 'rechazado',
+      message: 'Falta la cédula',
+      documents: [{ key: 'cedula', status: 'rechazado' }],
+    });
 
     const login1 = await login(psychologist.email);
-    const me = await request(app).get('/api/auth/me').set({ Authorization: `Bearer ${login1.body.token}` });
+    const me = await request(app)
+      .get('/api/auth/me')
+      .set({ Authorization: `Bearer ${login1.body.token}` });
     expect(me.body.verificationStatus).toBe('rechazado');
     expect(me.body.verificationMessage).toMatch(/Falta la cédula/);
     expect(me.body.verificationDocuments.find((d: { key: string }) => d.key === 'cedula').status).toBe('rechazado');
 
-    const created = await request(app).post('/api/schedule').set(auth(psychologist)).send({ day: futureDay(10), hour: '10:00' });
+    const created = await request(app)
+      .post('/api/schedule')
+      .set(auth(psychologist))
+      .send({ day: futureDay(10), hour: '10:00' });
     expect(created.status).toBe(403);
     expect(created.body.message).toMatch(/fue rechazada/);
   });
@@ -352,7 +375,9 @@ describe('cancelar una cita que ya pasó', () => {
       hour: '10:00',
     });
 
-    const res = await request(app).patch(`/api/appointments/appointment/cancel/${String(past._id)}`).set(auth(patient));
+    const res = await request(app)
+      .patch(`/api/appointments/appointment/cancel/${String(past._id)}`)
+      .set(auth(patient));
     expect(res.status).toBe(400);
     expect((await Appointment.findById(past._id))?.state).toBe('pendiente');
   });

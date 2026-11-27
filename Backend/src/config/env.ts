@@ -10,8 +10,7 @@ export const assertRequiredEnv = (): void => {
   const missing = REQUIRED_VARS.filter((name) => !process.env[name]?.trim());
   if (missing.length > 0) {
     throw new Error(
-      `Faltan variables de entorno obligatorias: ${missing.join(', ')}. ` +
-        'Copia Backend/.env.example a Backend/.env y rellénalas.'
+      `Faltan variables de entorno obligatorias: ${missing.join(', ')}. ` + 'Copia Backend/.env.example a Backend/.env y rellénalas.'
     );
   }
 };
@@ -24,8 +23,7 @@ export const getJwtSecret = (): string => {
   return secret;
 };
 
-export const getMongoUri = (): string =>
-  process.env.MONGO_URI || 'mongodb://localhost:27017/magicamente';
+export const getMongoUri = (): string => process.env.MONGO_URI || 'mongodb://localhost:27017/magicamente';
 
 export const getPort = (): number => Number(process.env.PORT) || 3000;
 
@@ -45,12 +43,10 @@ export const getAppTimezone = (): string => process.env.APP_TIMEZONE || 'UTC';
 
 export const getResendApiKey = (): string | undefined => process.env.RESEND_API_KEY || undefined;
 
-export const getEmailFrom = (): string =>
-  process.env.EMAIL_FROM || 'Soporte <support@magicamente.online>';
+export const getEmailFrom = (): string => process.env.EMAIL_FROM || 'Soporte <support@magicamente.online>';
 
 /** URL base del frontend, usada para construir el enlace de recuperación de contraseña. */
-export const getFrontendUrl = (): string =>
-  (process.env.FRONTEND_URL || 'http://localhost:5173').replace(/\/+$/, '');
+export const getFrontendUrl = (): string => (process.env.FRONTEND_URL || 'http://localhost:5173').replace(/\/+$/, '');
 
 /**
  * Orígenes web autorizados por CORS. Por defecto, solo el frontend (`FRONTEND_URL`).
@@ -59,7 +55,11 @@ export const getFrontendUrl = (): string =>
 export const getCorsOrigins = (): string[] | '*' => {
   const configured = process.env.CORS_ORIGIN?.trim();
   if (configured === '*') return '*';
-  if (configured) return configured.split(',').map((origin) => origin.trim().replace(/\/+$/, '')).filter(Boolean);
+  if (configured)
+    return configured
+      .split(',')
+      .map((origin) => origin.trim().replace(/\/+$/, ''))
+      .filter(Boolean);
   try {
     return [new URL(getFrontendUrl()).origin];
   } catch {

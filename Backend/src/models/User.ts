@@ -1,7 +1,13 @@
 import { Schema, model, Document, Types } from 'mongoose';
 import { getAppTimezone } from '../config/env';
 import { isValidTimeZone } from '../utils/timezone';
-import { DocumentReview, VerificationStatus, DOCUMENT_REVIEW_STATUSES, PSYCHOLOGIST_DOCUMENT_KEYS, VERIFICATION_STATUSES } from '../utils/verification';
+import {
+  DocumentReview,
+  VerificationStatus,
+  DOCUMENT_REVIEW_STATUSES,
+  PSYCHOLOGIST_DOCUMENT_KEYS,
+  VERIFICATION_STATUSES,
+} from '../utils/verification';
 
 export interface IUser extends Document {
   name: string;
@@ -109,9 +115,7 @@ UserSchema.set('toJSON', {
         const file = document.file as { storageKey?: string; contentType?: string; size?: number; uploadedAt?: Date } | undefined;
         const { file: _internal, ...rest } = document;
         void _internal;
-        return file?.storageKey
-          ? { ...rest, file: { contentType: file.contentType, size: file.size, uploadedAt: file.uploadedAt } }
-          : rest;
+        return file?.storageKey ? { ...rest, file: { contentType: file.contentType, size: file.size, uploadedAt: file.uploadedAt } } : rest;
       });
     }
     return ret;

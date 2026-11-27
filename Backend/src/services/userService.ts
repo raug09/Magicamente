@@ -31,18 +31,14 @@ export const getUserService = async (id: string): Promise<IUser | null> => {
 export const getPublicPsychologistService = async (id: string): Promise<IUser | null> => {
   return User.findOne({ _id: id, role: 'psicologo', approved: { $ne: false }, isActive: { $ne: false }, ...NOT_DELETED }).select(
     PUBLIC_PSYCHOLOGIST_FIELDS
- );
+  );
 };
 
 /**
  * Actualiza solo los campos permitidos para quien hace la petición.
  * Los campos no permitidos se rechazan con 403 para que el cliente lo sepa.
  */
-export const updateUserService = async (
-  id: string,
-  updateData: Record<string, unknown>,
-  requesterRole: Role
-): Promise<IUser | null> => {
+export const updateUserService = async (id: string, updateData: Record<string, unknown>, requesterRole: Role): Promise<IUser | null> => {
   const allowed: readonly string[] = requesterRole === 'administrador' ? ADMIN_EDITABLE : SELF_EDITABLE;
   const forbidden = Object.keys(updateData).filter((key) => !allowed.includes(key));
   if (forbidden.length > 0) {
@@ -77,7 +73,7 @@ const notifyCancellation = async (counterpartId: unknown, time: Date): Promise<v
     const { date, hour } = formatAppointmentDate(time, counterpart.timezone);
     await sendEmail('appointmentCancelled', counterpart.email, counterpart.name, date, hour);
   } catch (error) {
-    logger.error({ err: error }, 'Error al avisar de una cita cancelada'); 
+    logger.error({ err: error }, 'Error al avisar de una cita cancelada');
   }
 };
 
@@ -123,7 +119,7 @@ export const deleteUserService = async (id: string): Promise<IUser | null> => {
       },
       $unset: { description: '', passwordResetTokenHash: '', passwordResetExpires: '' },
     }
- );
+  );
 
   await deleteAllSessions(user._id);
   await deleteAllDocumentsOf(user._id); // los documentos de identidad no se conservan

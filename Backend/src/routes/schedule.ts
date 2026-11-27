@@ -1,10 +1,5 @@
 import { Router } from 'express';
-import {
-  createSchedule,
-  deleteSchedule,
-  getSchedulesByPsychologist,
-  updateSchedule,
-} from '../controllers/scheduleController';
+import { createSchedule, deleteSchedule, getSchedulesByPsychologist, updateSchedule } from '../controllers/scheduleController';
 import { isAuthenticated, requireRole } from '../middlewares/auth';
 import { asyncHandler } from '../middlewares/asyncHandler';
 import { validate } from '../validation/validate';

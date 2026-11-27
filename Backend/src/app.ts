@@ -84,11 +84,15 @@ export const createApp = ({ rateLimit = true, apiDocs = getApiDocsEnabled() }: A
     app.get('/api/docs/openapi.json', (req, res) => {
       res.json(getOpenApiDocument());
     });
-    app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(getOpenApiDocument(), {
+    app.use(
+      '/api/docs',
+      swaggerUi.serve,
+      swaggerUi.setup(getOpenApiDocument(), {
         customSiteTitle: 'API de Magicamente',
         // Conserva el token de «Authorize» al recargar la página.
         swaggerOptions: { persistAuthorization: true },
-      }));
+      })
+    );
   }
 
   for (const [path, router] of API_ROUTERS) app.use(path, router);

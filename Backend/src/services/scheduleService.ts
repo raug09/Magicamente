@@ -130,11 +130,7 @@ const OCCUPIED_MESSAGE = 'El horario tiene una cita reservada: cancélala antes 
  * Cambia el día y/o la hora de una franja libre. Se interpretan en la zona horaria ACTUAL del psicólogo,
  * y la franja pasa a guardarse con ella.
  */
-export const updateSchedule = async (
-  scheduleId: string,
-  user: AuthUser,
-  changes: { day?: string; hour?: string }
-) => {
+export const updateSchedule = async (scheduleId: string, user: AuthUser, changes: { day?: string; hour?: string }) => {
   const schedule = await getOwnedSchedule(scheduleId, user);
   if (!schedule.isAvailable) {
     throw new AppError(409, OCCUPIED_MESSAGE);

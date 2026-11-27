@@ -10,7 +10,13 @@ const router = Router();
 // Mis citas (paciente o psicólogo).
 router.get('/appointment', isAuthenticated, validate({ query: listAppointmentsQuery }), asyncHandler(getAppointments));
 // Solo pacientes reservan; el paciente es siempre el usuario autenticado.
-router.post('/appointment', isAuthenticated, requireRole('paciente'), validate({ body: createAppointmentSchema }), asyncHandler(scheduleAppointment));
+router.post(
+  '/appointment',
+  isAuthenticated,
+  requireRole('paciente'),
+  validate({ body: createAppointmentSchema }),
+  asyncHandler(scheduleAppointment)
+);
 // Cancelar: paciente o psicólogo de la cita, o administrador.
 router.patch('/appointment/cancel/:id', isAuthenticated, asyncHandler(cancelAppointment));
 // Marcar como completada: psicólogo de la cita o administrador, una vez pasada la hora.

@@ -24,7 +24,14 @@ export interface VerificationInput {
 
 /** Mensaje visible en la respuesta según el estado (lo ve el psicólogo en su perfil). */
 /** La revisión de documentos de un psicólogo, con su archivo si ya lo subió. Si no hay ninguna, la inicial. */
-export const reviewsOf = (user: { verificationDocuments?: Array<{ key?: string; status?: string; note?: string; file?: { storageKey?: string | null; contentType?: string | null; size?: number | null; uploadedAt?: Date | null } | null }> }): DocumentReview[] =>
+export const reviewsOf = (user: {
+  verificationDocuments?: Array<{
+    key?: string;
+    status?: string;
+    note?: string;
+    file?: { storageKey?: string | null; contentType?: string | null; size?: number | null; uploadedAt?: Date | null } | null;
+  }>;
+}): DocumentReview[] =>
   user.verificationDocuments?.length
     ? user.verificationDocuments.map((r) => ({
         key: r.key as DocumentKey,

@@ -3,10 +3,8 @@ import Appointment from '../src/models/appointment';
 import Schedule from '../src/models/Schedule';
 import { app, auth, createScheduleFor, createUser, request, TestUser } from './helpers';
 
-const book = (patient: TestUser, body: object) =>
-  request(app).post('/api/appointments/appointment').set(auth(patient)).send(body);
-const cancel = (user: TestUser, id: string) =>
-  request(app).patch(`/api/appointments/appointment/cancel/${id}`).set(auth(user));
+const book = (patient: TestUser, body: object) => request(app).post('/api/appointments/appointment').set(auth(patient)).send(body);
+const cancel = (user: TestUser, id: string) => request(app).patch(`/api/appointments/appointment/cancel/${id}`).set(auth(user));
 const update = (user: TestUser, id: string, body: object) =>
   request(app).patch(`/api/appointments/appointment/update/${id}`).set(auth(user)).send(body);
 
@@ -80,10 +78,7 @@ describe('POST /api/appointments/appointment', () => {
     const p2 = await createUser('paciente');
     const schedule = await createScheduleFor(psychologist.id);
 
-    const [r1, r2] = await Promise.all([
-      book(p1, { scheduleId: String(schedule._id) }),
-      book(p2, { scheduleId: String(schedule._id) }),
-    ]);
+    const [r1, r2] = await Promise.all([book(p1, { scheduleId: String(schedule._id) }), book(p2, { scheduleId: String(schedule._id) })]);
 
     expect([r1.status, r2.status].sort()).toEqual([201, 409]);
     expect(await Appointment.countDocuments()).toBe(1);

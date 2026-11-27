@@ -11,7 +11,10 @@ const login = async (email: string, password = 'secreto123'): Promise<string> =>
   expect(res.status).toBe(200);
   return res.body.token;
 };
-const me = (token: string) => request(app).get('/api/auth/me').set({ Authorization: `Bearer ${token}` });
+const me = (token: string) =>
+  request(app)
+    .get('/api/auth/me')
+    .set({ Authorization: `Bearer ${token}` });
 const bearer = (token: string) => ({ Authorization: `Bearer ${token}` });
 
 describe('login crea una sesión', () => {
@@ -146,4 +149,3 @@ describe('las sesiones también se cierran en otros casos', () => {
     expect((await request(app).get('/api/users').set(bearer(forged))).status).toBe(401);
   });
 });
-

@@ -55,7 +55,11 @@ const check = (name: string, ok: boolean, detail = '') => {
     check('la dirección del servidor de la cuenta responde', true, `HTTP ${response.status} sin firma: es lo esperado (403)`);
   } catch (error) {
     const cause = (error as { cause?: { message?: string; code?: string } }).cause;
-    check('la dirección del servidor de la cuenta responde', false, `no se pudo conectar: ${cause?.code ?? cause?.message ?? (error as Error).message}; el R2_ACCOUNT_ID no corresponde a una cuenta con R2 activado`);
+    check(
+      'la dirección del servidor de la cuenta responde',
+      false,
+      `no se pudo conectar: ${cause?.code ?? cause?.message ?? (error as Error).message}; el R2_ACCOUNT_ID no corresponde a una cuenta con R2 activado`
+    );
     process.exit(1);
   }
 

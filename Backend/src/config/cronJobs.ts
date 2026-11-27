@@ -24,11 +24,7 @@ export const sendAppointmentReminders = async (now = new Date()): Promise<number
   let sent = 0;
   for (const { _id } of candidates) {
     // Se "reserva" la cita antes de enviar para no duplicar si dos procesos coinciden.
-    const appointment = await Appointment.findOneAndUpdate(
-      { _id, reminderSent: { $ne: true } },
-      { reminderSent: true },
-      { new: true }
-    );
+    const appointment = await Appointment.findOneAndUpdate({ _id, reminderSent: { $ne: true } }, { reminderSent: true }, { new: true });
     if (!appointment) continue;
 
     try {

@@ -35,9 +35,7 @@ describe('GET /api/auth/me', () => {
 
 describe('POST /api/auth/register no devuelve sesión hasta confirmar el email', () => {
   it('devuelve el usuario pendiente de confirmar, sin token', async () => {
-    const res = await request(app)
-      .post('/api/auth/register')
-      .send({ name: 'Luis', email: 'luis@example.com', password: 'secreto123' });
+    const res = await request(app).post('/api/auth/register').send({ name: 'Luis', email: 'luis@example.com', password: 'secreto123' });
 
     expect(res.status).toBe(201);
     expect(res.body.token).toBeUndefined();
@@ -51,7 +49,9 @@ describe('POST /api/auth/register no devuelve sesión hasta confirmar el email',
 
     const login = await request(app).post('/api/auth/login').send({ email: 'luis@example.com', password: 'secreto123' });
     expect(login.status).toBe(200);
-    const me = await request(app).get('/api/auth/me').set({ Authorization: `Bearer ${login.body.token}` });
+    const me = await request(app)
+      .get('/api/auth/me')
+      .set({ Authorization: `Bearer ${login.body.token}` });
     expect(me.status).toBe(200);
     expect(me.body.email).toBe('luis@example.com');
   });
@@ -92,9 +92,7 @@ describe('DELETE /api/users/:id elimina la cuenta sin dejar datos huérfanos', (
     const patient = await createUser('paciente');
     await del(patient, patient.id);
 
-    const again = await request(app)
-      .post('/api/auth/register')
-      .send({ name: 'Nuevo', email: patient.email, password: 'secreto123' });
+    const again = await request(app).post('/api/auth/register').send({ name: 'Nuevo', email: patient.email, password: 'secreto123' });
     expect(again.status).toBe(201);
   });
 
@@ -198,7 +196,9 @@ describe('zona horaria del usuario', () => {
 
     await User.updateOne({ email: 'luis@example.com' }, { emailVerified: true });
     const login = await request(app).post('/api/auth/login').send({ email: 'luis@example.com', password: 'secreto123' });
-    const me = await request(app).get('/api/auth/me').set({ Authorization: `Bearer ${login.body.token}` });
+    const me = await request(app)
+      .get('/api/auth/me')
+      .set({ Authorization: `Bearer ${login.body.token}` });
     expect(me.body.timezone).toBe('America/Bogota');
   });
 

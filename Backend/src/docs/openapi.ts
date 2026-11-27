@@ -25,7 +25,9 @@ const bearer = registry.registerComponent('securitySchemes', 'bearerAuth', {
 
 // --- Piezas comunes ------------------------------------------------------------------------
 
-const objectId = z.string().openapi({ example: '6740c1f2a9b3c4d5e6f70812', description: 'Identificador de MongoDB (24 caracteres hexadecimales)' });
+const objectId = z
+  .string()
+  .openapi({ example: '6740c1f2a9b3c4d5e6f70812', description: 'Identificador de MongoDB (24 caracteres hexadecimales)' });
 const dateTime = z.string().openapi({ format: 'date-time', example: '2026-12-15T15:00:00.000Z' });
 
 const ErrorResponse = registry.register(
@@ -52,7 +54,11 @@ const page = <T extends ZodTypeAny>(item: T) =>
     items: z.array(item),
   });
 
-const StoredFileInfo = z.object({ contentType: z.string().openapi({ example: 'application/pdf' }), size: z.number().int(), uploadedAt: dateTime });
+const StoredFileInfo = z.object({
+  contentType: z.string().openapi({ example: 'application/pdf' }),
+  size: z.number().int(),
+  uploadedAt: dateTime,
+});
 
 const DocumentReview = registry.register(
   'DocumentReview',
@@ -96,7 +102,13 @@ const PublicPsychologist = registry.register(
 const PublicProfile = registry.register(
   'PublicProfile',
   z
-    .object({ _id: objectId, name: z.string(), role: z.literal('psicologo'), studies: z.array(z.string()), description: z.string().optional() })
+    .object({
+      _id: objectId,
+      name: z.string(),
+      role: z.literal('psicologo'),
+      studies: z.array(z.string()),
+      description: z.string().optional(),
+    })
     .openapi({ description: 'Perfil público de un psicólogo (sin email)' })
 );
 
@@ -145,7 +157,12 @@ const MyAppointment = registry.register(
 
 const SessionInfo = registry.register(
   'Session',
-  z.object({ _id: objectId, createdAt: dateTime, expiresAt: dateTime, current: z.boolean().openapi({ description: 'true si es la sesión de este token' }) })
+  z.object({
+    _id: objectId,
+    createdAt: dateTime,
+    expiresAt: dateTime,
+    current: z.boolean().openapi({ description: 'true si es la sesión de este token' }),
+  })
 );
 
 const DocumentUrl = registry.register(
@@ -191,8 +208,7 @@ interface Route {
 const add = ({ method, path, tag, summary, description, auth = true, body, query, params, ok, errors = [] }: Route) => {
   const openApiPath = path.replace(/:(\w+)/g, '{$1}');
   const pathParams = [...path.matchAll(/:(\w+)/g)].map((match) => match[1]);
-  const paramsSchema =
-    params ?? (pathParams.length ? z.object(Object.fromEntries(pathParams.map((name) => [name, objectId]))) : undefined);
+  const paramsSchema = params ?? (pathParams.length ? z.object(Object.fromEntries(pathParams.map((name) => [name, objectId]))) : undefined);
 
   const statusCodes = new Set([...(auth ? [401] : []), ...errors, 429]);
   registry.registerPath({
@@ -233,14 +249,23 @@ registry.registerPath({
 
 const A = 'Auth';
 add({
-  method: 'post', path: '/api/auth/register', tag: A, auth: false, body: s.registerSchema,
+  method: 'post',
+  path: '/api/auth/register',
+  tag: A,
+  auth: false,
+  body: s.registerSchema,
   summary: 'Registro (paciente o psicólogo)',
-  description: 'No devuelve sesión: llega un correo para confirmar el email y, hasta entonces, el login responde 403. Los psicólogos quedan en verificación pendiente.',
+  description:
+    'No devuelve sesión: llega un correo para confirmar el email y, hasta entonces, el login responde 403. Los psicólogos quedan en verificación pendiente.',
   ok: { status: 201, schema: z.object({ message: z.string(), user: User }), description: 'Cuenta creada' },
   errors: [400, 409],
 });
 add({
-  method: 'post', path: '/api/auth/login', tag: A, auth: false, body: s.loginSchema,
+  method: 'post',
+  path: '/api/auth/login',
+  tag: A,
+  auth: false,
+  body: s.loginSchema,
   summary: 'Iniciar sesión',
   description: '10 intentos fallidos cada 15 minutos por IP. 403 si el email no está confirmado o la cuenta está desactivada.',
   ok: { schema: z.object({ token: z.string() }), description: 'Token JWT (1 hora)' },
@@ -248,71 +273,157 @@ add({
 });
 add({ method: 'get', path: '/api/auth/me', tag: A, summary: 'Usuario de la sesión', ok: { schema: User, description: 'Perfil propio' } });
 add({
-  method: 'post', path: '/api/auth/forgot-password', tag: A, auth: false, body: s.forgotPasswordSchema,
+  method: 'post',
+  path: '/api/auth/forgot-password',
+  tag: A,
+  auth: false,
+  body: s.forgotPasswordSchema,
   summary: 'Pedir enlace para restablecer la contraseña',
   description: 'Responde igual exista o no la cuenta. El enlace caduca en 1 hora.',
-  ok: { schema: Message, description: 'Solicitud recibida' }, errors: [400],
+  ok: { schema: Message, description: 'Solicitud recibida' },
+  errors: [400],
 });
 add({
-  method: 'post', path: '/api/auth/reset-password', tag: A, auth: false, body: s.resetPasswordSchema,
-  summary: 'Restablecer la contraseña con el token del enlace', description: 'Cierra todas las sesiones abiertas.',
-  ok: { schema: Message, description: 'Contraseña cambiada' }, errors: [400],
+  method: 'post',
+  path: '/api/auth/reset-password',
+  tag: A,
+  auth: false,
+  body: s.resetPasswordSchema,
+  summary: 'Restablecer la contraseña con el token del enlace',
+  description: 'Cierra todas las sesiones abiertas.',
+  ok: { schema: Message, description: 'Contraseña cambiada' },
+  errors: [400],
 });
 add({
-  method: 'post', path: '/api/auth/verify-email', tag: A, auth: false, body: s.verifyEmailSchema,
-  summary: 'Confirmar el email con el token del correo', ok: { schema: Message, description: 'Email confirmado' }, errors: [400],
+  method: 'post',
+  path: '/api/auth/verify-email',
+  tag: A,
+  auth: false,
+  body: s.verifyEmailSchema,
+  summary: 'Confirmar el email con el token del correo',
+  ok: { schema: Message, description: 'Email confirmado' },
+  errors: [400],
 });
 add({
-  method: 'post', path: '/api/auth/resend-verification', tag: A, auth: false, body: s.resendVerificationSchema,
-  summary: 'Pedir otro enlace de confirmación', description: 'Responde igual exista o no la cuenta.',
-  ok: { schema: Message, description: 'Solicitud recibida' }, errors: [400],
+  method: 'post',
+  path: '/api/auth/resend-verification',
+  tag: A,
+  auth: false,
+  body: s.resendVerificationSchema,
+  summary: 'Pedir otro enlace de confirmación',
+  description: 'Responde igual exista o no la cuenta.',
+  ok: { schema: Message, description: 'Solicitud recibida' },
+  errors: [400],
 });
 add({
-  method: 'post', path: '/api/auth/change-email', tag: A, body: s.requestEmailChangeSchema,
-  summary: 'Pedir cambio de email', description: 'Exige la contraseña actual. El cambio se aplica al confirmar el enlace enviado a la nueva dirección.',
-  ok: { schema: Message, description: 'Enlace enviado' }, errors: [400, 409],
+  method: 'post',
+  path: '/api/auth/change-email',
+  tag: A,
+  body: s.requestEmailChangeSchema,
+  summary: 'Pedir cambio de email',
+  description: 'Exige la contraseña actual. El cambio se aplica al confirmar el enlace enviado a la nueva dirección.',
+  ok: { schema: Message, description: 'Enlace enviado' },
+  errors: [400, 409],
 });
 add({
-  method: 'post', path: '/api/auth/confirm-email-change', tag: A, auth: false, body: s.confirmEmailChangeSchema,
-  summary: 'Confirmar el cambio de email', ok: { schema: Message, description: 'Email cambiado' }, errors: [400, 409],
+  method: 'post',
+  path: '/api/auth/confirm-email-change',
+  tag: A,
+  auth: false,
+  body: s.confirmEmailChangeSchema,
+  summary: 'Confirmar el cambio de email',
+  ok: { schema: Message, description: 'Email cambiado' },
+  errors: [400, 409],
 });
-add({ method: 'post', path: '/api/auth/logout', tag: A, summary: 'Cerrar la sesión actual', ok: { schema: Message, description: 'Sesión cerrada' } });
-add({ method: 'post', path: '/api/auth/logout-all', tag: A, summary: 'Cerrar todas las sesiones', ok: { schema: Message, description: 'Sesiones cerradas' } });
-add({ method: 'get', path: '/api/auth/sessions', tag: A, summary: 'Sesiones abiertas', ok: { schema: z.array(SessionInfo), description: 'De la más reciente a la más antigua' } });
 add({
-  method: 'delete', path: '/api/auth/sessions/:id', tag: A, summary: 'Cerrar una sesión concreta',
-  ok: { schema: Message, description: 'Sesión cerrada' }, errors: [400, 404],
+  method: 'post',
+  path: '/api/auth/logout',
+  tag: A,
+  summary: 'Cerrar la sesión actual',
+  ok: { schema: Message, description: 'Sesión cerrada' },
+});
+add({
+  method: 'post',
+  path: '/api/auth/logout-all',
+  tag: A,
+  summary: 'Cerrar todas las sesiones',
+  ok: { schema: Message, description: 'Sesiones cerradas' },
+});
+add({
+  method: 'get',
+  path: '/api/auth/sessions',
+  tag: A,
+  summary: 'Sesiones abiertas',
+  ok: { schema: z.array(SessionInfo), description: 'De la más reciente a la más antigua' },
+});
+add({
+  method: 'delete',
+  path: '/api/auth/sessions/:id',
+  tag: A,
+  summary: 'Cerrar una sesión concreta',
+  ok: { schema: Message, description: 'Sesión cerrada' },
+  errors: [400, 404],
 });
 
 // --- Usuarios ------------------------------------------------------------------------------
 
 const U = 'Usuarios';
-add({ method: 'get', path: '/api/users', tag: U, summary: 'Listar usuarios (administrador)', ok: { schema: z.array(User), description: 'Todos los usuarios no eliminados' }, errors: [403] });
 add({
-  method: 'get', path: '/api/users/:id', tag: U, summary: 'Ver un usuario',
+  method: 'get',
+  path: '/api/users',
+  tag: U,
+  summary: 'Listar usuarios (administrador)',
+  ok: { schema: z.array(User), description: 'Todos los usuarios no eliminados' },
+  errors: [403],
+});
+add({
+  method: 'get',
+  path: '/api/users/:id',
+  tag: U,
+  summary: 'Ver un usuario',
   description: 'Perfil completo si es el propio o si pide un administrador; de un psicólogo aprobado, el perfil público; en otro caso 404.',
-  ok: { schema: z.union([User, PublicProfile]), description: 'Perfil' }, errors: [400, 404],
+  ok: { schema: z.union([User, PublicProfile]), description: 'Perfil' },
+  errors: [400, 404],
 });
 add({
-  method: 'put', path: '/api/users/:id', tag: U, body: s.updateUserSchema, summary: 'Actualizar un usuario (uno mismo o administrador)',
-  description: 'Uno mismo: name, description, studies, password, timezone. Un administrador además: email, role, isActive. Otro campo → 403. Cambiar la contraseña cierra todas las sesiones.',
-  ok: { schema: User, description: 'Usuario actualizado' }, errors: [400, 403, 404],
+  method: 'put',
+  path: '/api/users/:id',
+  tag: U,
+  body: s.updateUserSchema,
+  summary: 'Actualizar un usuario (uno mismo o administrador)',
+  description:
+    'Uno mismo: name, description, studies, password, timezone. Un administrador además: email, role, isActive. Otro campo → 403. Cambiar la contraseña cierra todas las sesiones.',
+  ok: { schema: User, description: 'Usuario actualizado' },
+  errors: [400, 403, 404],
 });
 add({
-  method: 'delete', path: '/api/users/:id', tag: U, summary: 'Eliminar una cuenta (uno mismo o administrador)',
+  method: 'delete',
+  path: '/api/users/:id',
+  tag: U,
+  summary: 'Eliminar una cuenta (uno mismo o administrador)',
   description: 'Anonimiza la cuenta, cancela sus citas pendientes y borra sus documentos.',
-  ok: { schema: Message, description: 'Cuenta eliminada' }, errors: [400, 403, 404, 409],
+  ok: { schema: Message, description: 'Cuenta eliminada' },
+  errors: [400, 403, 404, 409],
 });
 add({
-  method: 'put', path: '/api/users/:id/verification', tag: U, body: s.verificationSchema, summary: 'Verificar a un psicólogo (administrador)',
+  method: 'put',
+  path: '/api/users/:id/verification',
+  tag: U,
+  body: s.verificationSchema,
+  summary: 'Verificar a un psicólogo (administrador)',
   description: 'Aprobar exige los tres documentos subidos y en ok. Rechazar exige message. Se envía correo al aprobar o rechazar.',
-  ok: { schema: User, description: 'Usuario actualizado' }, errors: [400, 403, 404],
+  ok: { schema: User, description: 'Usuario actualizado' },
+  errors: [400, 403, 404],
 });
 add({
-  method: 'get', path: '/api/users/:id/verification/documents/:key/url', tag: U,
+  method: 'get',
+  path: '/api/users/:id/verification/documents/:key/url',
+  tag: U,
   params: z.object({ id: objectId, key: z.enum(PSYCHOLOGIST_DOCUMENT_KEYS) }),
-  summary: 'Abrir un documento de un psicólogo (administrador)', description: 'Enlace de 5 minutos. Cada apertura queda registrada.',
-  ok: { schema: DocumentUrl, description: 'Enlace temporal' }, errors: [400, 403, 404, 503],
+  summary: 'Abrir un documento de un psicólogo (administrador)',
+  description: 'Enlace de 5 minutos. Cada apertura queda registrada.',
+  ok: { schema: DocumentUrl, description: 'Enlace temporal' },
+  errors: [400, 403, 404, 503],
 });
 
 // --- Verificación (el psicólogo) -----------------------------------------------------------
@@ -323,7 +434,8 @@ registry.registerPath({
   path: '/api/verification/documents/{key}',
   tags: [V],
   summary: 'Subir o reemplazar un documento (psicólogo)',
-  description: 'PDF, JPG o PNG de hasta 5 MB en el campo `file`. El tipo se comprueba por el contenido. 409 si la cuenta ya está aprobada. 30 peticiones por hora.',
+  description:
+    'PDF, JPG o PNG de hasta 5 MB en el campo `file`. El tipo se comprueba por el contenido. 409 si la cuenta ya está aprobada. 30 peticiones por hora.',
   security: [{ [bearer.name]: [] }],
   request: {
     params: documentKey,
@@ -341,65 +453,116 @@ registry.registerPath({
   },
 });
 add({
-  method: 'get', path: '/api/verification/documents/:key/url', tag: V, params: documentKey,
-  summary: 'Abrir uno de mis documentos (psicólogo)', description: 'Enlace de 5 minutos. Cada apertura queda registrada.',
-  ok: { schema: DocumentUrl, description: 'Enlace temporal' }, errors: [400, 403, 404, 503],
+  method: 'get',
+  path: '/api/verification/documents/:key/url',
+  tag: V,
+  params: documentKey,
+  summary: 'Abrir uno de mis documentos (psicólogo)',
+  description: 'Enlace de 5 minutos. Cada apertura queda registrada.',
+  ok: { schema: DocumentUrl, description: 'Enlace temporal' },
+  errors: [400, 403, 404, 503],
 });
 
 // --- Psicólogos y franjas ------------------------------------------------------------------
 
 add({
-  method: 'get', path: '/api/psychologists', tag: 'Psicólogos', query: s.listPsychologistsQuery,
-  summary: 'Listado de psicólogos aprobados y activos', description: 'Ordenado por nombre. `q` busca en el nombre.',
-  ok: { schema: page(PublicPsychologist), description: 'Página de psicólogos' }, errors: [400],
+  method: 'get',
+  path: '/api/psychologists',
+  tag: 'Psicólogos',
+  query: s.listPsychologistsQuery,
+  summary: 'Listado de psicólogos aprobados y activos',
+  description: 'Ordenado por nombre. `q` busca en el nombre.',
+  ok: { schema: page(PublicPsychologist), description: 'Página de psicólogos' },
+  errors: [400],
 });
 
 const F = 'Franjas';
 add({
-  method: 'post', path: '/api/schedule', tag: F, body: s.createScheduleSchema, summary: 'Crear franjas (psicólogo aprobado o administrador)',
-  description: '`day` y `hour` en la zona horaria del psicólogo. `repeatWeeks` crea una por semana; las que ya existen van en `skipped`. Un administrador debe indicar `psychologist`.',
+  method: 'post',
+  path: '/api/schedule',
+  tag: F,
+  body: s.createScheduleSchema,
+  summary: 'Crear franjas (psicólogo aprobado o administrador)',
+  description:
+    '`day` y `hour` en la zona horaria del psicólogo. `repeatWeeks` crea una por semana; las que ya existen van en `skipped`. Un administrador debe indicar `psychologist`.',
   ok: {
     status: 201,
-    schema: z.object({ message: z.string(), schedules: z.array(Schedule), skipped: z.array(z.string().openapi({ example: '2027-01-05' })) }),
+    schema: z.object({
+      message: z.string(),
+      schedules: z.array(Schedule),
+      skipped: z.array(z.string().openapi({ example: '2027-01-05' })),
+    }),
     description: 'Franjas creadas',
   },
   errors: [400, 403, 404, 409],
 });
 add({
-  method: 'get', path: '/api/schedule/:psychologistId', tag: F, query: s.listSchedulesQuery,
-  summary: 'Franjas de un psicólogo', description: '`available=true`: solo libres y futuras. `from`/`to`: días del calendario del psicólogo. Ordenadas por `startsAt`.',
-  ok: { schema: page(Schedule), description: 'Página de franjas' }, errors: [400],
+  method: 'get',
+  path: '/api/schedule/:psychologistId',
+  tag: F,
+  query: s.listSchedulesQuery,
+  summary: 'Franjas de un psicólogo',
+  description: '`available=true`: solo libres y futuras. `from`/`to`: días del calendario del psicólogo. Ordenadas por `startsAt`.',
+  ok: { schema: page(Schedule), description: 'Página de franjas' },
+  errors: [400],
 });
 add({
-  method: 'put', path: '/api/schedule/:id', tag: F, body: s.updateScheduleSchema, summary: 'Mover una franja libre',
-  ok: { schema: z.object({ message: z.string(), schedule: Schedule }), description: 'Franja actualizada' }, errors: [400, 403, 404, 409],
+  method: 'put',
+  path: '/api/schedule/:id',
+  tag: F,
+  body: s.updateScheduleSchema,
+  summary: 'Mover una franja libre',
+  ok: { schema: z.object({ message: z.string(), schedule: Schedule }), description: 'Franja actualizada' },
+  errors: [400, 403, 404, 409],
 });
 add({
-  method: 'delete', path: '/api/schedule/:id', tag: F, summary: 'Borrar una franja libre',
-  ok: { schema: Message, description: 'Franja borrada' }, errors: [400, 403, 404, 409],
+  method: 'delete',
+  path: '/api/schedule/:id',
+  tag: F,
+  summary: 'Borrar una franja libre',
+  ok: { schema: Message, description: 'Franja borrada' },
+  errors: [400, 403, 404, 409],
 });
 
 // --- Citas ---------------------------------------------------------------------------------
 
 const C = 'Citas';
 add({
-  method: 'get', path: '/api/appointments/appointment', tag: C, query: s.listAppointmentsQuery,
-  summary: 'Mis citas (paciente o psicólogo)', ok: { schema: page(MyAppointment), description: 'Página de citas' }, errors: [400, 403],
+  method: 'get',
+  path: '/api/appointments/appointment',
+  tag: C,
+  query: s.listAppointmentsQuery,
+  summary: 'Mis citas (paciente o psicólogo)',
+  ok: { schema: page(MyAppointment), description: 'Página de citas' },
+  errors: [400, 403],
 });
 add({
-  method: 'post', path: '/api/appointments/appointment', tag: C, body: s.createAppointmentSchema, summary: 'Reservar una franja (paciente)',
+  method: 'post',
+  path: '/api/appointments/appointment',
+  tag: C,
+  body: s.createAppointmentSchema,
+  summary: 'Reservar una franja (paciente)',
   ok: { status: 201, schema: z.object({ message: z.string(), appointment: Appointment }), description: 'Cita reservada' },
   errors: [400, 403, 404, 409],
 });
 add({
-  method: 'patch', path: '/api/appointments/appointment/cancel/:id', tag: C, summary: 'Cancelar una cita pendiente (participante o administrador)',
+  method: 'patch',
+  path: '/api/appointments/appointment/cancel/:id',
+  tag: C,
+  summary: 'Cancelar una cita pendiente (participante o administrador)',
   description: 'No se puede cancelar una cita cuya hora ya pasó. Libera la franja.',
-  ok: { schema: z.object({ message: z.string(), appointment: Appointment }), description: 'Cita cancelada' }, errors: [400, 403, 404],
+  ok: { schema: z.object({ message: z.string(), appointment: Appointment }), description: 'Cita cancelada' },
+  errors: [400, 403, 404],
 });
 add({
-  method: 'patch', path: '/api/appointments/appointment/update/:id', tag: C, body: s.updateAppointmentSchema,
-  summary: 'Marcar como completada (psicólogo de la cita o administrador)', description: 'Solo `{ "state": "completada" }` y después de la hora de la cita.',
-  ok: { schema: z.object({ message: z.string(), updatedAppointment: Appointment }), description: 'Cita actualizada' }, errors: [400, 403, 404],
+  method: 'patch',
+  path: '/api/appointments/appointment/update/:id',
+  tag: C,
+  body: s.updateAppointmentSchema,
+  summary: 'Marcar como completada (psicólogo de la cita o administrador)',
+  description: 'Solo `{ "state": "completada" }` y después de la hora de la cita.',
+  ok: { schema: z.object({ message: z.string(), updatedAppointment: Appointment }), description: 'Cita actualizada' },
+  errors: [400, 403, 404],
 });
 
 // --- Documento -----------------------------------------------------------------------------

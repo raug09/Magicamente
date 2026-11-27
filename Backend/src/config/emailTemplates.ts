@@ -158,10 +158,7 @@ export const emailTemplates = {
     build({
       subject: `Confirma tu correo en ${APP_NAME}`,
       heading: 'Confirma tu correo',
-      paragraphs: [
-        `Hola ${name}.`,
-        `Gracias por crear tu cuenta. Para activarla, confirma que este es tu correo.`,
-      ],
+      paragraphs: [`Hola ${name}.`, `Gracias por crear tu cuenta. Para activarla, confirma que este es tu correo.`],
       action: { label: 'Confirmar correo', url: verifyLink },
       note: 'El enlace caduca en 24 horas y solo se puede usar una vez. Si no creaste una cuenta, ignora este mensaje.',
     }),
@@ -170,10 +167,7 @@ export const emailTemplates = {
     build({
       subject: 'Restablece tu contraseña',
       heading: 'Restablece tu contraseña',
-      paragraphs: [
-        `Hola ${name}.`,
-        'Recibimos una solicitud para cambiar la contraseña de tu cuenta.',
-      ],
+      paragraphs: [`Hola ${name}.`, 'Recibimos una solicitud para cambiar la contraseña de tu cuenta.'],
       action: { label: 'Crear una contraseña nueva', url: resetLink },
       note: 'El enlace caduca en 1 hora y solo se puede usar una vez. Si no fuiste tú, ignora este mensaje: tu contraseña no cambiará.',
     }),

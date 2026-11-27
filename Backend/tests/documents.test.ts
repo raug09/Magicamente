@@ -22,8 +22,7 @@ const newPsychologist = async () => {
   return psychologist;
 };
 
-const document = async (userId: string, key: string) =>
-  (await User.findById(userId))?.verificationDocuments?.find((d) => d.key === key);
+const document = async (userId: string, key: string) => (await User.findById(userId))?.verificationDocuments?.find((d) => d.key === key);
 
 describe('subida de documentos', () => {
   it('un psicólogo sube un PDF: queda pendiente de revisión, sin exponer la clave interna', async () => {
@@ -107,9 +106,7 @@ describe('subida de documentos', () => {
 
   it('tres subidas simultáneas guardan los tres documentos', async () => {
     const psychologist = await newPsychologist();
-    const results = await Promise.all(
-      ['tarjeta_profesional', 'cedula', 'diploma'].map((key) => upload(psychologist, key, PDF))
-    );
+    const results = await Promise.all(['tarjeta_profesional', 'cedula', 'diploma'].map((key) => upload(psychologist, key, PDF)));
     expect(results.map((r) => r.status)).toEqual([200, 200, 200]);
 
     const stored = (await User.findById(psychologist.id))?.verificationDocuments ?? [];
@@ -320,7 +317,14 @@ describe('normalización del id de cuenta de R2', () => {
   it('acepta el id solo o la dirección completa del endpoint, con comillas o espacios', async () => {
     const { normalizeR2AccountId } = await import('../src/config/env');
     const id = '0123456789abcdef0123456789abcdef';
-    for (const value of [id, ` ${id} `, `"${id}"`, `https://${id}.r2.cloudflarestorage.com`, `https://${id}.r2.cloudflarestorage.com/`, `${id}.r2.cloudflarestorage.com`]) {
+    for (const value of [
+      id,
+      ` ${id} `,
+      `"${id}"`,
+      `https://${id}.r2.cloudflarestorage.com`,
+      `https://${id}.r2.cloudflarestorage.com/`,
+      `${id}.r2.cloudflarestorage.com`,
+    ]) {
       expect(normalizeR2AccountId(value)).toBe(id);
     }
   });

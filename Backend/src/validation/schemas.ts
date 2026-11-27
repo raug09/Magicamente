@@ -162,7 +162,9 @@ export const listSchedulesQuery = z
 export const createAppointmentSchema = z.object({ scheduleId: text('scheduleId', 64) });
 
 /** El servicio decide qué estados se aceptan; aquí solo el tipo. Otros campos pasan para dar 403. */
-export const updateAppointmentSchema = z.object({ state: z.string({ invalid_type_error: 'state debe ser un texto' }).optional() }).passthrough();
+export const updateAppointmentSchema = z
+  .object({ state: z.string({ invalid_type_error: 'state debe ser un texto' }).optional() })
+  .passthrough();
 
 export const listAppointmentsQuery = z.object({ ...pagination });
 
@@ -185,4 +187,3 @@ export const documentKeyParams = z.object({
   key: z.enum(PSYCHOLOGIST_DOCUMENT_KEYS, { errorMap: () => ({ message: 'El documento no es válido' }) }),
   id: z.string().optional(),
 });
-

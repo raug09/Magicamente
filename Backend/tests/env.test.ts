@@ -65,7 +65,10 @@ describe('TRUST_PROXY', () => {
 describe('CORS_ORIGIN', () => {
   const original = { cors: process.env.CORS_ORIGIN, frontend: process.env.FRONTEND_URL };
   afterEach(() => {
-    for (const [key, value] of [['CORS_ORIGIN', original.cors], ['FRONTEND_URL', original.frontend]] as const) {
+    for (const [key, value] of [
+      ['CORS_ORIGIN', original.cors],
+      ['FRONTEND_URL', original.frontend],
+    ] as const) {
       if (value === undefined) delete process.env[key];
       else process.env[key] = value;
     }

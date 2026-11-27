@@ -67,11 +67,7 @@ export const uploadDocumentService = async (userId: string, key: DocumentKey, bu
  * Enlace temporal para abrir un documento. Lo puede pedir su dueño (psicólogo) o un administrador;
  * cada acceso queda registrado.
  */
-export const getDocumentUrlService = async (
-  requester: { id: string; role: string },
-  ownerId: string,
-  key: DocumentKey
-) => {
+export const getDocumentUrlService = async (requester: { id: string; role: string }, ownerId: string, key: DocumentKey) => {
   if (requester.role !== 'administrador' && requester.id !== ownerId) {
     throw new AppError(403, 'Solo puedes abrir tus propios documentos');
   }
