@@ -4,6 +4,7 @@ import { defineConfig } from 'vitest/config';
 // (esbuild ya compila JSX con "jsx": "react-jsx").
 export default defineConfig({
   test: {
+    include: ['src/**/*.test.{ts,tsx}'],
     environment: 'jsdom',
     globals: true,
     setupFiles: ['./src/test/setup.ts'],

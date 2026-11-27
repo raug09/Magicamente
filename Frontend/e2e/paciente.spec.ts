@@ -30,7 +30,7 @@ test('registro: crea la cuenta y pide revisar el correo', async ({ page }) => {
   await page.getByLabel('Email').fill(email);
   await page.getByLabel('Contraseña').fill(PASSWORD);
   await page.getByRole('button', { name: 'Crear cuenta' }).click();
-  await expect(page.getByText('Revisa tu correo')).toBeVisible();
+  await expect(page.getByRole('alert')).toContainText('Revisa tu correo');
 });
 
 test('paciente: busca, reserva una cita y la cancela', async ({ page }) => {
