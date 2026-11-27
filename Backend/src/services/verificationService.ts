@@ -74,10 +74,14 @@ export const setVerificationService = async (userId: string, input: Verification
   const updated = await User.findByIdAndUpdate(
     user._id,
     {
-      verificationStatus: input.status,
-      verificationMessage: input.status === 'rechazado' ? message : undefined,
-      verificationDocuments: reviews,
-      approved: input.status === 'aprobado', // derivado: lo usan las consultas que filtran psicólogos aprobados
+      // Mongoose ignora los `undefined`: para borrar el motivo hay que usar $unset.
+      $set: {
+        verificationStatus: input.status,
+        verificationDocuments: reviews,
+        approved: input.status === 'aprobado', // derivado: lo usan las consultas que filtran psicólogos aprobados
+        ...(input.status === 'rechazado' && { verificationMessage: message }),
+      },
+      ...(input.status !== 'rechazado' && { $unset: { verificationMessage: '' } }),
     },
     { new: true }
   ).select('-password');
