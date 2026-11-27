@@ -2,7 +2,7 @@
 
 Base: `http://localhost:3000` · Formato: JSON · Autenticación: cabecera `Authorization: Bearer <token>` donde se indica 🔒.
 
-Los errores responden `{ "message": "..." }` con un código HTTP adecuado (400 datos no válidos o id mal formado, 401 sin sesión, 403 sin permiso, 404 no existe, 409 duplicado). Ver [01 · Arquitectura](01-arquitectura.md#manejo-de-errores).
+**Errores comunes a toda la API:** `401` sin sesión, con token inválido/caducado, o si la cuenta fue borrada o desactivada; `429` si se superan los límites de intentos (ver [arquitectura](01-arquitectura.md#protección-del-servidor)). Los errores responden `{ "message": "..." }` con un código HTTP adecuado (400 datos no válidos o id mal formado, 401 sin sesión, 403 sin permiso, 404 no existe, 409 duplicado). Ver [01 · Arquitectura](01-arquitectura.md#manejo-de-errores).
 
 Leyenda: ✅ funciona · ⚠️ funciona con salvedades · ❌ roto (detalles en [06 · Problemas conocidos](06-problemas-conocidos.md)).
 
@@ -50,6 +50,7 @@ Los antiguos `POST /api/email/send-test` y `GET /api/notifications/test` se **el
 ```
 
 - `role` opcional: `paciente` (por defecto) o `psicologo`. Cualquier otro valor, incluido `administrador` → `400`.
+- `password`: entre 8 caracteres y 72 bytes → si no, `400`.
 - `name`, `email`, `password` obligatorios → si faltan, `400`. `studies` debe ser una lista de textos.
 - Email ya usado → `409`.
 - Tras guardar intenta enviar el correo `confirmation`; si falla, solo lo registra en el log.
@@ -63,6 +64,8 @@ Los antiguos `POST /api/email/send-test` y `GET /api/notifications/test` se **el
 
 - `200 { "token": "eyJ..." }` · payload `{ id, role, iat, exp }`, caduca en 1 h.
 - `401 { "message": "Credenciales inválidas" }` · `400` si faltan campos.
+- `403 "Cuenta desactivada"` si la contraseña es correcta pero la cuenta está desactivada (con contraseña incorrecta siempre es `401`).
+- Límite: 10 intentos **fallidos** cada 15 minutos por IP; después `429`. Los inicios de sesión correctos no cuentan.
 - Para conocer tu `_id`, decodifica el payload del JWT.
 
 ### `POST /api/auth/forgot-password`
@@ -75,6 +78,7 @@ Los antiguos `POST /api/email/send-test` y `GET /api/notifications/test` se **el
 - Si la cuenta existe y está activa, se envía un correo con el enlace `<FRONTEND_URL>/reset-password?token=<token>`. El enlace **caduca en 1 hora** y **solo se puede usar una vez**.
 - Como mucho **un correo por minuto y cuenta**: si se vuelve a pedir antes, no se envía otro. Pasado ese minuto, el token nuevo invalida el anterior.
 - `400` si falta `email` o no es un texto.
+- Límite: 10 por hora y IP, compartido con `register` y `reset-password`; después `429`.
 
 ### `POST /api/auth/reset-password`
 
@@ -86,7 +90,7 @@ Los antiguos `POST /api/email/send-test` y `GET /api/notifications/test` se **el
 - `400` si falta algún campo, si la contraseña tiene menos de **8 caracteres** (el token no se gasta), o si el token no es válido, ya se usó o caducó (`"El enlace no es válido o ha caducado"`).
 - No permite restablecer cuentas desactivadas.
 - El token se guarda hasheado (SHA-256) en la base de datos; nunca en claro.
-- ⚠️ Los JWT ya emitidos siguen valiendo hasta que caduquen (máx. 1 h). Ver [problemas conocidos](06-problemas-conocidos.md).
+- Al restablecer, **todas las sesiones abiertas se cierran** (los tokens anteriores devuelven `401`).
 
 ## Usuarios
 
@@ -107,7 +111,7 @@ Campos permitidos:
 | Administrador | los anteriores + `email`, `role`, `isActive` |
 
 - Un campo no permitido → `403` indicando cuál. Editar a otro usuario sin ser admin → `403`.
-- `password` se guarda hasheada.
+- `password` debe cumplir la política (8 caracteres–72 bytes) y se guarda hasheada. **Cambiarla cierra las sesiones abiertas, también la actual**: hay que volver a iniciar sesión.
 - Devuelve el usuario actualizado (sin `password`), o `404`.
 
 ### `DELETE /api/users/:id` 🔒 uno mismo o admin

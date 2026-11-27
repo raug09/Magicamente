@@ -2,6 +2,7 @@ import User, { IUser } from '../models/User';
 import { ROLES, Role } from '../middlewares/auth';
 import { AppError } from '../utils/AppError';
 import { hashPassword } from './authService';
+import { assertValidPassword } from '../utils/password';
 
 /** Campos visibles de un psicólogo para cualquier usuario autenticado. */
 const PUBLIC_PSYCHOLOGIST_FIELDS = 'name role studies description';
@@ -37,10 +38,8 @@ export const updateUserService = async (
   const update: Record<string, unknown> = { ...updateData };
 
   if ('password' in update) {
-    if (typeof update.password !== 'string' || update.password.trim() === '') {
-      throw new AppError(400, 'password debe ser un texto no vacío');
-    }
-    update.password = await hashPassword(update.password);
+    update.password = await hashPassword(assertValidPassword(update.password));
+    update.passwordChangedAt = new Date(); // invalida las sesiones abiertas (también la actual)
   }
   if ('role' in update && !ROLES.includes(update.role as Role)) {
     throw new AppError(400, `role debe ser uno de: ${ROLES.join(', ')}`);

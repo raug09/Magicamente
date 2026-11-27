@@ -25,6 +25,8 @@ Edita `Backend/.env`:
 | `RESEND_API_KEY` | para enviar correos | — | Envío de correo |
 | `EMAIL_FROM` | no | `Soporte <support@magicamente.online>` | Remitente |
 | `APP_TIMEZONE` | no | `UTC` | Zona horaria de las fechas en los correos |
+| `CORS_ORIGIN` | no | solo `FRONTEND_URL` | Orígenes web autorizados (lista separada por comas, o `*`) |
+| `TRUST_PROXY` | detrás de un proxy | sin definir | Nº de proxies delante del servidor (p. ej. `1` en Render, Railway, Heroku o Nginx). **Ponlo si despliegas detrás de un proxy**: si no, el límite de intentos vería la IP del proxy y bloquearía a todos a la vez |
 | `FRONTEND_URL` | para recuperar contraseña | `http://localhost:5173` | URL base del frontend; el correo enlaza a `<FRONTEND_URL>/reset-password?token=...` |
 
 ## Ejecución
@@ -114,7 +116,7 @@ curl -s -X POST $API/api/auth/reset-password -H 'Content-Type: application/json'
   -d '{"token":"<TOKEN>","password":"nueva-clave-123"}'
 ```
 
-Sin `RESEND_API_KEY` el correo **no se envía** y el token no aparece en ningún log (a propósito), así que para probar el flujo completo hace falta una clave de Resend. Los tests automáticos no la necesitan: interceptan el correo. La contraseña nueva debe tener al menos 8 caracteres.
+Sin `RESEND_API_KEY` el correo **no se envía** y el token no aparece en ningún log (a propósito), así que para probar el flujo completo hace falta una clave de Resend. Los tests automáticos no la necesitan: interceptan el correo. La contraseña nueva debe tener entre 8 caracteres y 72 bytes, y al restablecerla se cierran las sesiones abiertas.
 
 ## Correos
 
@@ -132,6 +134,10 @@ Sin `RESEND_API_KEY` verás en consola `[email] RESEND_API_KEY no definido; no s
 | `No se pudo iniciar el servidor: ... ECONNREFUSED` | `MONGO_URI` incorrecta o Mongo no está arrancado |
 | `400 El enlace no es válido o ha caducado` | El token ya se usó, pasó más de 1 hora, o se pidió un enlace más reciente (invalida el anterior) |
 | No llega el correo de recuperación | Falta `RESEND_API_KEY`, la cuenta está desactivada, o se pidió hace menos de 1 minuto |
+| `429 Demasiadas peticiones` | Superaste un límite por IP (login: 10 fallos/15 min; registro, forgot y reset: 10/hora; API: 300/15 min). Mira `Retry-After` |
+| `401 La sesión ha caducado: vuelve a iniciar sesión` | Cambiaste o restableciste la contraseña después de emitir ese token |
+| `401 La cuenta no existe o está desactivada` | Cuenta borrada o con `isActive: false` |
+| El frontend recibe error de CORS | Su dirección no coincide con `FRONTEND_URL` ni está en `CORS_ORIGIN` |
 | `401 Token no válido` | El token caducó (1 h) o `JWT_SECRET` cambió desde que se emitió |
 | `403` al editar un usuario | Solo puedes editar tu cuenta, y solo `name`, `description`, `studies`, `password` |
 | `403` al crear un horario | Solo los psicólogos (para sí mismos) o los administradores |

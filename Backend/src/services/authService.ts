@@ -6,6 +6,7 @@ import { sendEmail } from './emailService';
 import { getFrontendUrl, getJwtSecret } from '../config/env';
 import { AppError } from '../utils/AppError';
 import { Role } from '../middlewares/auth';
+import { assertValidPassword } from '../utils/password';
 
 /** Roles que se pueden elegir en el registro público. Los administradores se crean aparte. */
 export const SELF_REGISTER_ROLES: Role[] = ['paciente', 'psicologo'];
@@ -27,6 +28,7 @@ export const registerService = async ({ name, email, password, role = 'paciente'
   if (!SELF_REGISTER_ROLES.includes(role)) {
     throw new AppError(400, `Rol no permitido en el registro. Usa: ${SELF_REGISTER_ROLES.join(', ')}`);
   }
+  assertValidPassword(password);
 
   const existingUser = await User.findOne({ email });
   if (existingUser) {
@@ -57,6 +59,10 @@ export const loginService = async (email: string, password: string): Promise<str
   if (!user || !(await bcrypt.compare(password, user.password))) {
     throw new AppError(401, 'Credenciales inválidas');
   }
+  // Solo se revela tras acertar la contraseña, para no delatar qué cuentas existen.
+  if (user.isActive === false) {
+    throw new AppError(403, 'Cuenta desactivada');
+  }
 
   return jwt.sign({ id: user._id, role: user.role }, getJwtSecret(), { expiresIn: '1h' });
 };
@@ -65,7 +71,6 @@ export const loginService = async (email: string, password: string): Promise<str
 
 export const RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // el enlace caduca en 1 hora
 export const RESET_REQUEST_COOLDOWN_MS = 60 * 1000; // como mucho un correo por minuto y cuenta
-export const MIN_PASSWORD_LENGTH = 8;
 
 const hashToken = (token: string): string => crypto.createHash('sha256').update(token).digest('hex');
 
@@ -97,15 +102,14 @@ export const forgotPasswordService = async (email: string): Promise<void> => {
 
 /** Cambia la contraseña con un token válido, no caducado y sin usar. El token se consume. */
 export const resetPasswordService = async (token: string, newPassword: string): Promise<void> => {
-  if (newPassword.length < MIN_PASSWORD_LENGTH) {
-    throw new AppError(400, `La contraseña debe tener al menos ${MIN_PASSWORD_LENGTH} caracteres`);
-  }
+  assertValidPassword(newPassword);
 
   // Una sola operación atómica: dos peticiones con el mismo token no pueden usarlo a la vez.
   const user = await User.findOneAndUpdate(
     { passwordResetTokenHash: hashToken(token), passwordResetExpires: { $gt: new Date() }, isActive: { $ne: false } },
     {
       password: await hashPassword(newPassword),
+      passwordChangedAt: new Date(), // invalida las sesiones abiertas
       $unset: { passwordResetTokenHash: '', passwordResetExpires: '' },
     }
   );

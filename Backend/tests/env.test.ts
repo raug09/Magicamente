@@ -40,3 +40,47 @@ describe('FRONTEND_URL', () => {
     expect(getFrontendUrl()).toBe('https://app.magicamente.online');
   });
 });
+
+import { getCorsOrigins, getTrustProxy } from '../src/config/env';
+
+describe('TRUST_PROXY', () => {
+  const original = process.env.TRUST_PROXY;
+  afterEach(() => {
+    if (original === undefined) delete process.env.TRUST_PROXY;
+    else process.env.TRUST_PROXY = original;
+  });
+
+  it('sin definir no se confía en ningún proxy; admite número y booleanos', () => {
+    delete process.env.TRUST_PROXY;
+    expect(getTrustProxy()).toBeUndefined();
+    process.env.TRUST_PROXY = '1';
+    expect(getTrustProxy()).toBe(1);
+    process.env.TRUST_PROXY = 'true';
+    expect(getTrustProxy()).toBe(true);
+    process.env.TRUST_PROXY = 'valor-raro';
+    expect(getTrustProxy()).toBeUndefined();
+  });
+});
+
+describe('CORS_ORIGIN', () => {
+  const original = { cors: process.env.CORS_ORIGIN, frontend: process.env.FRONTEND_URL };
+  afterEach(() => {
+    for (const [key, value] of [['CORS_ORIGIN', original.cors], ['FRONTEND_URL', original.frontend]] as const) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  });
+
+  it('por defecto es el origen del frontend', () => {
+    delete process.env.CORS_ORIGIN;
+    process.env.FRONTEND_URL = 'https://app.magicamente.online/ruta';
+    expect(getCorsOrigins()).toEqual(['https://app.magicamente.online']);
+  });
+
+  it('acepta lista y comodín', () => {
+    process.env.CORS_ORIGIN = 'https://a.com/, https://b.com';
+    expect(getCorsOrigins()).toEqual(['https://a.com', 'https://b.com']);
+    process.env.CORS_ORIGIN = '*';
+    expect(getCorsOrigins()).toBe('*');
+  });
+});

@@ -13,6 +13,8 @@ export interface IUser extends Document {
   /** SHA-256 del token de recuperación enviado por correo (nunca el token en claro). */
   passwordResetTokenHash?: string;
   passwordResetExpires?: Date;
+  /** Los tokens de sesión emitidos antes de esta fecha dejan de valer. */
+  passwordChangedAt?: Date;
 }
 
 const UserSchema = new Schema<IUser>({
@@ -27,6 +29,7 @@ const UserSchema = new Schema<IUser>({
   schedules: [{ type: Schema.Types.ObjectId, ref: 'Schedule' }],
   passwordResetTokenHash: { type: String, select: false },
   passwordResetExpires: { type: Date, select: false },
+  passwordChangedAt: { type: Date, select: false },
 });
 
 export default model<IUser>('User', UserSchema);

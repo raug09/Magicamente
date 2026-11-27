@@ -6,7 +6,7 @@ import Schedule from '../src/models/Schedule';
 import { hashPassword } from '../src/services/authService';
 import { Role } from '../src/middlewares/auth';
 
-export const app = createApp();
+export const app = createApp({ rateLimit: false });
 
 export interface TestUser {
   id: string;

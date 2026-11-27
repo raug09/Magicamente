@@ -16,25 +16,25 @@ describe('POST /api/auth/register', () => {
   });
 
   it('permite registrarse como psicólogo', async () => {
-    const res = await register({ name: 'Ana', email: 'ana@example.com', password: 'x', role: 'psicologo', studies: ['Clínica'] });
+    const res = await register({ name: 'Ana', email: 'ana@example.com', password: 'secreto123', role: 'psicologo', studies: ['Clínica'] });
     expect(res.status).toBe(201);
     expect((await User.findOne({ email: 'ana@example.com' }))?.role).toBe('psicologo');
   });
 
   it('rechaza registrarse como administrador', async () => {
-    const res = await register({ name: 'Eva', email: 'eva@example.com', password: 'x', role: 'administrador' });
+    const res = await register({ name: 'Eva', email: 'eva@example.com', password: 'secreto123', role: 'administrador' });
     expect(res.status).toBe(400);
     expect(await User.countDocuments()).toBe(0);
   });
 
   it('rechaza un rol inexistente', async () => {
-    const res = await register({ name: 'Eva', email: 'eva@example.com', password: 'x', role: 'superusuario' });
+    const res = await register({ name: 'Eva', email: 'eva@example.com', password: 'secreto123', role: 'superusuario' });
     expect(res.status).toBe(400);
   });
 
   it('devuelve 409 si el email ya existe', async () => {
-    await register({ name: 'Luis', email: 'luis@example.com', password: 'x' });
-    const res = await register({ name: 'Luis 2', email: 'luis@example.com', password: 'y' });
+    await register({ name: 'Luis', email: 'luis@example.com', password: 'secreto123' });
+    const res = await register({ name: 'Luis 2', email: 'luis@example.com', password: 'secreto456' });
     expect(res.status).toBe(409);
   });
 

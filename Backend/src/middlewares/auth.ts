@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { getJwtSecret } from '../config/env';
+import User from '../models/User';
 
 export const ROLES = ['paciente', 'psicologo', 'administrador'] as const;
 export type Role = (typeof ROLES)[number];
@@ -25,27 +26,54 @@ export type AuthenticatedRequest = Request;
 
 /**
  * Verifica el JWT enviado en "Authorization: Bearer <token>" y deja el usuario en `req.user`.
+ *
+ * Además del token se consulta la base de datos en cada petición, así que:
+ *  - un usuario borrado o desactivado pierde el acceso al instante;
+ *  - un cambio de rol se aplica al instante (se usa el rol de la BD, no el del token);
+ *  - los tokens emitidos antes de cambiar la contraseña dejan de valer.
  */
-export const isAuthenticated = (req: Request, res: Response, next: NextFunction): void => {
-  const authHeader = req.headers.authorization;
-
-  if (!authHeader) {
-    res.status(401).json({ message: 'No se proporcionó token de autenticación' });
-    return;
-  }
-
-  const [scheme, token] = authHeader.split(' ');
-  if (scheme !== 'Bearer' || !token) {
-    res.status(401).json({ message: 'Token inválido o mal formado' });
-    return;
-  }
-
+export const isAuthenticated = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const decoded = jwt.verify(token, getJwtSecret()) as AuthUser;
-    req.user = { id: String(decoded.id), role: decoded.role };
+    const authHeader = req.headers.authorization;
+
+    if (!authHeader) {
+      res.status(401).json({ message: 'No se proporcionó token de autenticación' });
+      return;
+    }
+
+    const [scheme, token] = authHeader.split(' ');
+    if (scheme !== 'Bearer' || !token) {
+      res.status(401).json({ message: 'Token inválido o mal formado' });
+      return;
+    }
+
+    let decoded: jwt.JwtPayload;
+    try {
+      const payload = jwt.verify(token, getJwtSecret(), { algorithms: ['HS256'] });
+      if (typeof payload === 'string') throw new Error('payload inesperado');
+      decoded = payload;
+    } catch {
+      res.status(401).json({ message: 'Token no válido' });
+      return;
+    }
+
+    const user = await User.findById(decoded.id).select('role isActive +passwordChangedAt');
+    if (!user || user.isActive === false) {
+      res.status(401).json({ message: 'La cuenta no existe o está desactivada' });
+      return;
+    }
+
+    // `iat` está en segundos: se compara con la contraseña cambiada, también en segundos.
+    const changedAtSeconds = user.passwordChangedAt ? Math.floor(user.passwordChangedAt.getTime() / 1000) : 0;
+    if (typeof decoded.iat !== 'number' || decoded.iat < changedAtSeconds) {
+      res.status(401).json({ message: 'La sesión ha caducado: vuelve a iniciar sesión' });
+      return;
+    }
+
+    req.user = { id: String(user._id), role: user.role };
     next();
-  } catch {
-    res.status(401).json({ message: 'Token no válido' });
+  } catch (error) {
+    next(error);
   }
 };
 

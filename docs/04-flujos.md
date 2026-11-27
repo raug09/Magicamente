@@ -19,7 +19,7 @@ sequenceDiagram
   API->>U: 200 {token} (JWT 1h con id y role) · 401 si falla
 ```
 
-No hay verificación de email ni cierre de sesión (los JWT son sin estado y caducan a la hora).
+No hay verificación de email ni botón de “cerrar sesión” en el servidor: el cliente borra su token. Aun así, un token deja de valer al instante si se borra o desactiva al usuario, o si cambia su contraseña (ver [arquitectura](01-arquitectura.md#autenticación-y-autorización)).
 
 ### Recuperación de contraseña
 
@@ -38,7 +38,7 @@ sequenceDiagram
   API->>F: 200 mensaje genérico (igual exista o no el email)
   U->>F: abre el enlace del correo y escribe la nueva contraseña
   F->>API: POST /api/auth/reset-password {token, password}
-  API->>DB: findOneAndUpdate atómico: hash válido y no caducado → nueva contraseña + borra el token
+  API->>DB: findOneAndUpdate atómico: hash válido y no caducado → nueva contraseña + passwordChangedAt + borra el token (cierra las sesiones abiertas)
   API->>F: 200 (o 400 si es inválido, caducado o ya usado)
 ```
 
@@ -46,7 +46,7 @@ Decisiones de seguridad:
 - El token son 32 bytes aleatorios (`crypto.randomBytes`); la base de datos solo guarda su hash, así que una filtración de la BD no permite restablecer cuentas.
 - La respuesta es idéntica exista o no el email, y el correo se envía en segundo plano para que el tiempo de respuesta tampoco lo delate.
 - Un solo uso garantizado por una operación atómica; dos peticiones simultáneas con el mismo token no pueden ganar las dos.
-- Límite de un correo por minuto y cuenta, para que no se use el endpoint para inundar a alguien de correos. Falta un límite por IP (ver hoja de ruta).
+- Dos límites contra el abuso: un correo por minuto y cuenta, y 10 peticiones por hora y IP.
 - El nombre del usuario se escapa en el HTML del correo.
 
 **El frontend** debe tener una pantalla `/reset-password` que lea `token` de la URL y llame a `reset-password`. Configura su dirección en `FRONTEND_URL`.

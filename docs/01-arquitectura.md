@@ -24,14 +24,17 @@ Magicamente/
         │   ├── migrations.ts        Migración idempotente al arrancar (estados e índices de citas)
         │   └── emailTemplates.ts    Plantillas HTML de correo
         ├── middlewares/
-        │   ├── auth.ts              isAuthenticated, requireRole, isAdmin, isSelfOrAdmin
+        │   ├── auth.ts              isAuthenticated (JWT + BD), requireRole, isAdmin, isSelfOrAdmin
+        │   ├── rateLimiters.ts      Límites de intentos por IP (login, rutas sensibles, general)
         │   ├── asyncHandler.ts      Lleva los errores de handlers async al middleware de errores
         │   └── errorHandler.ts      404 de rutas y traducción de errores a JSON
         ├── models/                  Esquemas Mongoose (User, Schedule, appointment)
         ├── routes/                  Definición de endpoints
         ├── controllers/             Validan la entrada y responden
         ├── services/                Lógica de negocio y acceso a datos
-        └── utils/AppError.ts        Error con código HTTP
+        └── utils/
+            ├── AppError.ts          Error con código HTTP
+            └── password.ts          Política de contraseña común (8–72 bytes)
 ```
 
 ## Capas
@@ -92,14 +95,35 @@ Los servicios y controladores lanzan `new AppError(404, 'Usuario no encontrado')
 
 ## Autenticación y autorización
 
-- `POST /api/auth/login` devuelve un JWT firmado con `JWT_SECRET` (obligatorio, sin valor por defecto), payload `{ id, role }`, caducidad 1 hora.
-- `isAuthenticated` exige `Authorization: Bearer <token>` y deja `req.user = { id, role }` (tipado globalmente en `auth.ts`).
+- `POST /api/auth/login` devuelve un JWT (HS256) firmado con `JWT_SECRET` (obligatorio, sin valor por defecto), payload `{ id, role }`, caducidad 1 hora.
+- `isAuthenticated` exige `Authorization: Bearer <token>` y **además consulta la base de datos en cada petición**:
+  - usuario borrado o desactivado (`isActive: false`) → `401` al instante;
+  - el **rol** que cuenta es el de la base de datos, no el del token: un cambio de rol se aplica al instante;
+  - si el token se emitió **antes** de `passwordChangedAt` (cambio o restablecimiento de contraseña) → `401`, hay que volver a iniciar sesión.
+  - Solo se aceptan tokens HS256 (se rechazan `alg: none` y otros algoritmos).
+  - Deja `req.user = { id, role }` (tipado globalmente en `auth.ts`).
 - `requireRole('psicologo', 'administrador')` deja pasar solo esos roles.
 - `isAdmin` = `requireRole('administrador')`.
 - `isSelfOrAdmin()` exige que `req.params.id` sea el propio usuario, o rol administrador.
-- La propiedad de las citas se comprueba en `appointmentService.getOwnedAppointment` (paciente o psicólogo de la cita, o administrador).
+- La propiedad de las citas se comprueba en `appointmentService.getOwnedAppointment`.
 
 Roles: `paciente` (por defecto), `psicologo`, `administrador`. El registro público solo admite los dos primeros.
+
+**Política de contraseña** (`utils/password.ts`): entre 8 caracteres y 72 bytes (bcrypt ignora lo que pase de 72). Se aplica igual al registro, a `PUT /api/users/:id` y a `reset-password`.
+
+## Protección del servidor (`app.ts`)
+
+| Capa | Qué hace |
+|---|---|
+| `helmet()` | Cabeceras de seguridad (HSTS, `nosniff`, `X-Frame-Options`…) y oculta `X-Powered-By` |
+| CORS | Solo el origen de `FRONTEND_URL`; `CORS_ORIGIN` admite una lista separada por comas o `*` |
+| `express.json({ limit: '100kb' })` | Tamaño máximo del cuerpo |
+| Límite de intentos por IP | `general`: 300 peticiones / 15 min en toda la API · `login`: 10 intentos **fallidos** / 15 min (los correctos no cuentan) · `sensitive`: 10 / hora, **contador común** a registro, `forgot-password` y `reset-password` |
+| `trust proxy` | Solo si defines `TRUST_PROXY` (número de proxies delante). Sin él, no se confía en `X-Forwarded-For` |
+
+Superado un límite, la API responde `429 { "message": "Demasiadas peticiones. Inténtalo de nuevo más tarde." }` con la cabecera `Retry-After`. Los contadores están en memoria: se reinician al reiniciar el servidor y **no se comparten entre varias instancias** (si algún día escalas a varias, habrá que usar un almacén común como Redis).
+
+`createApp({ rateLimit: false })` desactiva los límites (lo usan los tests; `tests/security.test.ts` prueba los reales).
 
 ## Correo
 

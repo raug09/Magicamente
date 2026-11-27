@@ -49,12 +49,13 @@ erDiagram
 | `email` | String | obligatorio, **único** | Sin normalizar (mayúsculas/espacios cuentan como distintos) |
 | `password` | String | obligatorio | Hash bcrypt (10 rondas), también al cambiarla por `PUT /api/users/:id` |
 | `role` | enum | `paciente` (defecto), `psicologo`, `administrador` | En el registro solo `paciente` o `psicologo`; el resto lo cambia un administrador |
-| `isActive` | Boolean | defecto `true` | No se usa en ningún sitio (no bloquea el login) |
+| `isActive` | Boolean | defecto `true` | `false` bloquea el login (403), invalida los tokens (401), oculta al psicólogo del listado y no recibe correos de recuperación |
 | `studies` | [String] | defecto `[]` | Formación del psicólogo |
 | `description` | String | | No se puede rellenar al registrarse, solo con `PUT` |
 | `schedules` | [ObjectId → Schedule] | | Se añade cada horario creado; nunca se limpia |
 | `passwordResetTokenHash` | String | oculto (`select: false`) | SHA-256 del token de recuperación; se borra al usarlo |
 | `passwordResetExpires` | Date | oculto (`select: false`) | Caducidad del token (1 h); `expires - 1 h` indica cuándo se pidió |
+| `passwordChangedAt` | Date | oculto (`select: false`) | Se actualiza al cambiar o restablecer la contraseña; los tokens anteriores dejan de valer |
 | `createdAt` | Date | defecto ahora | |
 
 ## `Schedule` (`models/Schedule.ts`)

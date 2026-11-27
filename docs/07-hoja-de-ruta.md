@@ -31,6 +31,10 @@ Las referencias (S1, F2…) apuntan a [06 · Problemas conocidos](06-problemas-c
 
 - `forgot-password` / `reset-password` con token hasheado de 1 h y un solo uso (ver [04](04-flujos.md)).
 
+## ✅ Hecho: bloque de seguridad
+
+- Sesiones validadas contra la BD (borrado, desactivado, cambio de rol y de contraseña surten efecto al instante), política de contraseña común, límite de intentos por IP, `helmet` y CORS restringido (S10–S15).
+
 ## Siguiente · Completar el producto mínimo
 
 - [ ] `GET /api/auth/me` para que el frontend obtenga el usuario sin decodificar el JWT.
@@ -41,8 +45,6 @@ Las referencias (S1, F2…) apuntan a [06 · Problemas conocidos](06-problemas-c
 ## Calidad y despliegue
 
 - [ ] Validación de entrada con `zod`.
-- [ ] `helmet`, `express-rate-limit` en login, registro y `forgot-password`, CORS restringido al dominio del frontend (S10, S15).
-- [ ] Invalidar los JWT al cambiar la contraseña o desactivar al usuario (S12, S13) y una política de contraseña común (S14).
 - [ ] ESLint + Prettier; logger (`pino`) en lugar de `console.log`.
 - [ ] Dockerfile + `docker-compose.yml` (API + Mongo).
 - [ ] Documentación OpenAPI/Swagger.

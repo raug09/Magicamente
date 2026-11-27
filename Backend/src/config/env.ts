@@ -40,3 +40,30 @@ export const getEmailFrom = (): string =>
 /** URL base del frontend, usada para construir el enlace de recuperación de contraseña. */
 export const getFrontendUrl = (): string =>
   (process.env.FRONTEND_URL || 'http://localhost:5173').replace(/\/+$/, '');
+
+/**
+ * Orígenes web autorizados por CORS. Por defecto, solo el frontend (`FRONTEND_URL`).
+ * `CORS_ORIGIN` admite una lista separada por comas, o `*` para abrirlo a cualquiera.
+ */
+export const getCorsOrigins = (): string[] | '*' => {
+  const configured = process.env.CORS_ORIGIN?.trim();
+  if (configured === '*') return '*';
+  if (configured) return configured.split(',').map((origin) => origin.trim().replace(/\/+$/, '')).filter(Boolean);
+  try {
+    return [new URL(getFrontendUrl()).origin];
+  } catch {
+    return [];
+  }
+};
+
+/**
+ * Cuántos proxies hay delante del servidor (para que el límite de intentos use la IP real del cliente).
+ * Sin `TRUST_PROXY` no se confía en ninguna cabecera `X-Forwarded-For`.
+ */
+export const getTrustProxy = (): number | boolean | undefined => {
+  const value = process.env.TRUST_PROXY?.trim();
+  if (!value) return undefined;
+  if (value === 'true') return true;
+  if (value === 'false') return false;
+  return /^\d+$/.test(value) ? Number(value) : undefined;
+};
