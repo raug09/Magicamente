@@ -34,6 +34,9 @@ if (!formats[0][1]) {
   process.exit(1);
 }
 
+// Longitudes (no valores): ayudan a detectar datos pegados en el campo equivocado.
+console.log(`INFO longitud de R2_ACCESS_KEY_ID: ${config.accessKeyId.length}; de R2_SECRET_ACCESS_KEY: ${config.secretAccessKey.length}`);
+
 const storage = new R2Storage(config);
 const key = `smoke-test/${crypto.randomUUID()}.pdf`;
 const body = Buffer.from(`%PDF-1.4\nprueba de humo ${new Date().toISOString()}\n`);
@@ -45,6 +48,17 @@ const check = (name: string, ok: boolean, detail = '') => {
 };
 
 (async () => {
+  // ¿Existe el servidor de esta cuenta? Sin firma, un servidor real responde 403 (o similar); si el id no
+  // corresponde a ninguna cuenta, ni siquiera se completa la conexión TLS.
+  try {
+    const response = await fetch(`https://${config.accountId}.r2.cloudflarestorage.com/${config.bucket}`);
+    check('la dirección del servidor de la cuenta responde', true, `HTTP ${response.status} sin firma: es lo esperado (403)`);
+  } catch (error) {
+    const cause = (error as { cause?: { message?: string; code?: string } }).cause;
+    check('la dirección del servidor de la cuenta responde', false, `no se pudo conectar: ${cause?.code ?? cause?.message ?? (error as Error).message}; el R2_ACCOUNT_ID no corresponde a una cuenta con R2 activado`);
+    process.exit(1);
+  }
+
   try {
     await storage.put(key, body, 'application/pdf');
     check('subir un archivo', true);
