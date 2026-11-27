@@ -4,6 +4,13 @@ name: Prueba real de Cloudflare R2
 # privado y lo borra. Necesita los secretos R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY y R2_BUCKET.
 on:
   workflow_dispatch:
+  # Mientras el archivo no esté en la rama principal no se puede lanzar a mano: se ejecuta cuando cambian
+  # la propia prueba o su workflow (nunca en pushes que no los toquen).
+  push:
+    paths:
+      - 'Backend/scripts/r2-smoke.ts'
+      - 'Backend/src/storage/**'
+      - '.github/workflows/r2-smoke.yml'
 
 jobs:
   smoke:
