@@ -1,6 +1,6 @@
 /**
  * Verificación de psicólogos: estados, documentos requeridos y su revisión.
- * La subida de archivos no existe todavía: el administrador revisa cada documento y lo marca.
+ * El psicólogo sube cada archivo (ver verificationDocumentService) y un administrador lo revisa y lo marca.
  */
 
 /** Documentos que debe presentar todo psicólogo. El orden es el que se muestra en los correos. */

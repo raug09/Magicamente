@@ -11,16 +11,30 @@ import psychologistRoutes from './routes/psychologist';
 import verificationRoutes from './routes/verification';
 import { errorHandler, notFoundHandler } from './middlewares/errorHandler';
 import { createRateLimiters } from './middlewares/rateLimiters';
-import { getCorsOrigins, getTrustProxy } from './config/env';
+import swaggerUi from 'swagger-ui-express';
+import { getApiDocsEnabled, getCorsOrigins, getTrustProxy } from './config/env';
+import { getOpenApiDocument } from './docs/openapi';
 import { logger } from './utils/logger';
+
+/** Routers de la API y dónde se montan. Lo usa también el test que comprueba que todo está documentado. */
+export const API_ROUTERS = [
+  ['/api/auth', authRoutes],
+  ['/api/users', userRoutes],
+  ['/api/appointments', appointmentRoutes],
+  ['/api/schedule', scheduleRoutes],
+  ['/api/psychologists', psychologistRoutes],
+  ['/api/verification', verificationRoutes],
+] as const;
 
 export interface AppOptions {
   /** Límite de intentos por IP. Activado por defecto; los tests lo desactivan salvo los suyos. */
   rateLimit?: boolean;
+  /** Documentación en /api/docs. Por defecto, según API_DOCS (activada salvo en producción). */
+  apiDocs?: boolean;
 }
 
 /** Crea la aplicación Express sin conectar a la BD ni escuchar en un puerto (útil para tests). */
-export const createApp = ({ rateLimit = true }: AppOptions = {}) => {
+export const createApp = ({ rateLimit = true, apiDocs = getApiDocsEnabled() }: AppOptions = {}) => {
   const app = express();
 
   const trustProxy = getTrustProxy();
@@ -65,12 +79,19 @@ export const createApp = ({ rateLimit = true }: AppOptions = {}) => {
     res.status(dbUp ? 200 : 503).json({ status: dbUp ? 'ok' : 'error', db: dbUp ? 'up' : 'down' });
   });
 
-  app.use('/api/auth', authRoutes);
-  app.use('/api/users', userRoutes);
-  app.use('/api/appointments', appointmentRoutes);
-  app.use('/api/schedule', scheduleRoutes);
-  app.use('/api/psychologists', psychologistRoutes);
-  app.use('/api/verification', verificationRoutes);
+  // Documentación interactiva (Swagger UI) y el esquema OpenAPI en JSON.
+  if (apiDocs) {
+    app.get('/api/docs/openapi.json', (req, res) => {
+      res.json(getOpenApiDocument());
+    });
+    app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(getOpenApiDocument(), {
+        customSiteTitle: 'API de Magicamente',
+        // Conserva el token de «Authorize» al recargar la página.
+        swaggerOptions: { persistAuthorization: true },
+      }));
+  }
+
+  for (const [path, router] of API_ROUTERS) app.use(path, router);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

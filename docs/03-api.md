@@ -2,6 +2,10 @@
 
 Base: `http://localhost:3000` · Formato: JSON · Autenticación: cabecera `Authorization: Bearer <token>` donde se indica 🔒.
 
+**Documentación interactiva (Swagger):** `GET /api/docs` muestra todas las rutas y permite probarlas (botón **Authorize** con el token del login). El esquema OpenAPI 3 está en `GET /api/docs/openapi.json` y versionado en [`docs/openapi.json`](openapi.json). Activa por defecto salvo con `NODE_ENV=production`; `API_DOCS=true|false` lo fuerza.
+- Las **entradas** (body, query, parámetros) salen de los mismos esquemas `zod` que validan las peticiones, así que siempre coinciden con lo que acepta el servidor. Las respuestas se describen en `Backend/src/docs/openapi.ts`.
+- Un test falla si una ruta nueva no está documentada o si `docs/openapi.json` no está al día: después de tocar rutas o validaciones, ejecuta `npm run openapi` en `Backend/`.
+
 **Errores comunes a toda la API:** `401` sin sesión, con token inválido/caducado, o si la cuenta fue borrada o desactivada; `429` si se superan los límites de intentos (ver [arquitectura](01-arquitectura.md#protección-del-servidor)). Los errores responden `{ "message": "..." }` (los de validación añaden `"errors": [{ "field", "message" }]` con **todos** los campos inválidos) con un código HTTP adecuado (400 datos no válidos o id mal formado, 401 sin sesión, 403 sin permiso, 404 no existe, 409 duplicado). Ver [01 · Arquitectura](01-arquitectura.md#manejo-de-errores).
 
 Leyenda: ✅ funciona · ⚠️ funciona con salvedades · ❌ roto (detalles en [06 · Problemas conocidos](06-problemas-conocidos.md)).

@@ -11,6 +11,7 @@ Documento pensado para quien construya el frontend (persona o sesión de Claude)
 | Base | `http://localhost:3000` en desarrollo. Todas las rutas empiezan por `/api` |
 | Formato | JSON en ambos sentidos (`Content-Type: application/json`) |
 | CORS | El backend **solo** acepta el origen configurado en `FRONTEND_URL` (por defecto `http://localhost:5173`, el puerto de Vite) o en `CORS_ORIGIN`. Si el frontend corre en otra dirección, hay que cambiar esa variable en `Backend/.env` |
+| Documentación interactiva | `http://localhost:3000/api/docs` (Swagger UI: prueba cada ruta con el botón **Authorize** y tu token). El esquema OpenAPI está en `/api/docs/openapi.json` y, versionado, en [`docs/openapi.json`](openapi.json) |
 | Errores | Siempre `{ "message": "texto en español" }`. Los `400` de validación añaden `"errors": [{ "field": "email", "message": "…" }, …]` con **todos** los campos inválidos: úsalo para marcar cada campo del formulario (`message` es el primero, para un aviso general) |
 
 ## 2. Sesión y autenticación
@@ -300,7 +301,7 @@ Las dos últimas son nombres elegidos por el backend; si el frontend usa otras r
 - Las respuestas de usuario **nunca** incluyen contraseña ni datos de recuperación.
 - Los correos (confirmación, recordatorio 24 h antes de la cita, recuperación) los envía el backend; el frontend no hace nada.
 - El recordatorio se envía **una sola vez** por cita pendiente, aproximadamente 24 h antes.
-- No hay paginación en “mis citas” ni en las franjas: devuelven todo (usa `from`/`to`/`available` para acotar).
+- Las listas (psicólogos, franjas, mis citas) vienen paginadas: `{ total, page, limit, pages, items }`, máximo 50 por página.
 
 ## 8. Cómo desarrollar el frontend contra el backend
 
@@ -312,14 +313,15 @@ npm install && npm run dev             # http://localhost:3000
 - Pon en `Backend/.env`: `FRONTEND_URL=http://localhost:5173` (o la dirección real de tu frontend) para el CORS y para el enlace del correo de recuperación.
 - Sin `RESEND_API_KEY` los correos **no se envían** y el token de recuperación no aparece en ningún lado: para probar el flujo de recuperación completo necesitas una clave de Resend (o consultar el token directamente en la base de datos).
 - Datos de prueba: ver el recorrido con `curl` del [manual](05-manual-de-uso.md#recorrido-completo-con-curl).
+- **Tipos de TypeScript generados**: `npx openapi-typescript ../docs/openapi.json -o src/api/schema.d.ts` (desde `Frontend/`) crea los tipos de todas las peticiones y respuestas. Vuelve a generarlos cuando cambie `docs/openapi.json`.
 - Los límites de intentos (`429`) pueden molestar en desarrollo: son por IP y se reinician al reiniciar el backend.
 
 ## 9. Pendientes
 
 ### Backend que facilitaría el frontend (por orden de utilidad)
 
-- [ ] Paginación en “mis citas”.
-- [ ] Documentación OpenAPI/Swagger generada (así el frontend puede generar sus tipos automáticamente).
+- [x] Paginación en “mis citas”.
+- [x] Documentación OpenAPI/Swagger generada: `docs/openapi.json` y `/api/docs` (ver §8 para generar los tipos).
 
 ### Frontend (todo)
 

@@ -28,6 +28,7 @@ Edita `Backend/.env`:
 | `CORS_ORIGIN` | no | solo `FRONTEND_URL` | Orígenes web autorizados (lista separada por comas, o `*`) |
 | `TRUST_PROXY` | detrás de un proxy | sin definir | Nº de proxies delante del servidor (p. ej. `1` en Render, Railway, Heroku o Nginx). **Ponlo si despliegas detrás de un proxy**: si no, el límite de intentos vería la IP del proxy y bloquearía a todos a la vez |
 | `LOG_LEVEL` | no | `info` | `trace`, `debug`, `info`, `warn`, `error`, `fatal` o `silent` |
+| `API_DOCS` | no | activada salvo con `NODE_ENV=production` | `true`/`false`: documentación Swagger en `/api/docs` |
 | `FRONTEND_URL` | para recuperar contraseña | `http://localhost:5173` | URL base del frontend; el correo enlaza a `<FRONTEND_URL>/reset-password?token=...` |
 
 ## Ejecución con Docker (API + MongoDB)

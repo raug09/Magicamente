@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from './zod';
 import { ROLES } from '../middlewares/auth';
 import { isValidTimeZone, parseDayString } from '../utils/timezone';
 import { PSYCHOLOGIST_DOCUMENT_KEYS, VERIFICATION_STATUSES } from '../utils/verification';
@@ -25,11 +25,13 @@ const validEmail = emailField.email('email no tiene un formato válido');
 /** La política de longitud (8–72 bytes) se aplica en el servicio; aquí solo el tipo. */
 const passwordField = z
   .string({ required_error: 'password es obligatorio', invalid_type_error: 'password debe ser un texto' })
-  .min(1, 'password es obligatorio');
+  .min(1, 'password es obligatorio')
+  .openapi({ description: 'Entre 8 caracteres y 72 bytes', example: 'secreto123' });
 
 const timezoneField = z
   .string({ invalid_type_error: 'timezone debe ser un texto' })
-  .refine(isValidTimeZone, 'timezone debe ser una zona horaria válida (p. ej. "America/Bogota" o "Europe/Madrid")');
+  .refine(isValidTimeZone, 'timezone debe ser una zona horaria válida (p. ej. "America/Bogota" o "Europe/Madrid")')
+  .openapi({ description: 'Zona horaria IANA', example: 'America/Bogota' });
 
 const studiesField = z
   .array(text('studies', 200), { invalid_type_error: 'studies debe ser una lista de textos' })
@@ -38,12 +40,14 @@ const studiesField = z
 const DAY_MESSAGE = 'day debe ser una fecha válida con formato YYYY-MM-DD (p. ej. "2026-12-15")';
 const dayField = z
   .string({ required_error: DAY_MESSAGE, invalid_type_error: DAY_MESSAGE })
-  .refine((value) => parseDayString(value) !== null, DAY_MESSAGE);
+  .refine((value) => parseDayString(value) !== null, DAY_MESSAGE)
+  .openapi({ description: 'Día del calendario (YYYY-MM-DD)', example: '2026-12-15' });
 
 const HOUR_MESSAGE = 'hour debe tener formato HH:mm';
 const hourField = z
   .string({ required_error: HOUR_MESSAGE, invalid_type_error: HOUR_MESSAGE })
-  .regex(/^([01]\d|2[0-3]):[0-5]\d$/, HOUR_MESSAGE);
+  .regex(/^([01]\d|2[0-3]):[0-5]\d$/, HOUR_MESSAGE)
+  .openapi({ description: 'Hora local (HH:mm, 24 h)', example: '10:00' });
 
 // --- Auth ----------------------------------------------------------------------------------
 
@@ -105,14 +109,20 @@ export const MAX_PAGE_SIZE = 50;
 
 /** Paginación compartida: `page` desde 1, `limit` por defecto 20 y máximo 50. */
 export const pagination = {
-  page: positiveInt('page').default('1'),
+  page: positiveInt('page').default('1').openapi({ description: 'Página, desde 1' }),
   limit: positiveInt('limit')
     .default('20')
-    .transform((value) => Math.min(value, MAX_PAGE_SIZE)),
+    .transform((value) => Math.min(value, MAX_PAGE_SIZE))
+    .openapi({ description: `Elementos por página (máximo ${MAX_PAGE_SIZE}; un valor mayor se recorta)` }),
 };
 
 export const listPsychologistsQuery = z.object({
-  q: z.string({ invalid_type_error: 'q debe ser un texto' }).trim().max(100, 'q es demasiado largo').optional(),
+  q: z
+    .string({ invalid_type_error: 'q debe ser un texto' })
+    .trim()
+    .max(100, 'q es demasiado largo')
+    .optional()
+    .openapi({ description: 'Texto a buscar en el nombre (sin distinguir mayúsculas)' }),
   ...pagination,
 });
 

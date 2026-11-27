@@ -29,6 +29,17 @@ export const getMongoUri = (): string =>
 
 export const getPort = (): number => Number(process.env.PORT) || 3000;
 
+/**
+ * Documentación de la API en /api/docs. `API_DOCS=true` o `false` la fuerza;
+ * sin definir, está activada salvo con `NODE_ENV=production`.
+ */
+export const getApiDocsEnabled = (): boolean => {
+  const value = process.env.API_DOCS?.trim().toLowerCase();
+  if (value === 'true') return true;
+  if (value === 'false') return false;
+  return process.env.NODE_ENV !== 'production';
+};
+
 /** Zona horaria con la que se muestran fechas en los correos. Las horas se guardan en UTC. */
 export const getAppTimezone = (): string => process.env.APP_TIMEZONE || 'UTC';
 
