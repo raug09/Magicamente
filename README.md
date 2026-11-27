@@ -40,3 +40,4 @@ npm test                # tests de integración (descarga MongoDB la primera vez
 | [05 · Manual de uso](docs/05-manual-de-uso.md) | Instalación, configuración y uso paso a paso con `curl` |
 | [06 · Problemas conocidos](docs/06-problemas-conocidos.md) | Fallos, riesgos de seguridad y deuda técnica, por prioridad |
 | [07 · Hoja de ruta](docs/07-hoja-de-ruta.md) | Plan propuesto para retomar el proyecto |
+| [08 · Guía para el frontend](docs/08-guia-frontend.md) | Contrato de la API por pantalla, sesión, errores, zonas horarias y pendientes para construir el frontend |

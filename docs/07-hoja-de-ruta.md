@@ -49,6 +49,10 @@ Las referencias (S1, F2…) apuntan a [06 · Problemas conocidos](06-problemas-c
 - [ ] Dockerfile + `docker-compose.yml` (API + Mongo).
 - [ ] Documentación OpenAPI/Swagger.
 
+## Frontend
+
+Todo lo que necesita quien lo construya, y su lista de pendientes, está en [08 · Guía para el frontend](08-guia-frontend.md).
+
 ## Preguntas abiertas para el equipo
 
 1. ¿Dónde está (o estará) el **frontend**? ¿Qué URL debe aceptar CORS?
