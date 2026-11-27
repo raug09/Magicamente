@@ -8,6 +8,7 @@ import { AppError } from '../utils/AppError';
 import { Role } from '../middlewares/auth';
 import { assertValidPassword } from '../utils/password';
 import { assertValidTimeZone } from '../utils/timezone';
+import { logger } from '../utils/logger';
 
 /** Roles que se pueden elegir en el registro público. Los administradores se crean aparte. */
 export const SELF_REGISTER_ROLES: Role[] = ['paciente', 'psicologo'];
@@ -56,7 +57,7 @@ export const registerService = async ({ name, email, password, role = 'paciente'
     await sendEmail('confirmation', email, name);
   } catch (error) {
     // El usuario ya está guardado: un fallo de correo no debe romper el registro.
-    console.error('Error al enviar email de confirmación:', error);
+    logger.error({ err: error }, 'Error al enviar email de confirmación');
   }
 
   return newUser;
@@ -104,7 +105,7 @@ export const forgotPasswordService = async (email: string): Promise<void> => {
   // En segundo plano: así la respuesta tarda lo mismo exista o no el email.
   const resetLink = `${getFrontendUrl()}/reset-password?token=${token}`;
   sendEmail('resetPassword', user.email, user.name, resetLink).catch((error) => {
-    console.error('Error al enviar el correo de recuperación de contraseña:', error);
+    logger.error({ err: error }, 'Error al enviar el correo de recuperación de contraseña');
   });
 };
 

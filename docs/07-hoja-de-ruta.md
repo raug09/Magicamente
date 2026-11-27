@@ -43,14 +43,16 @@ Las referencias (S1, F2…) apuntan a [06 · Problemas conocidos](06-problemas-c
 
 - `timezone` por usuario, `startsAt` como instante real, `repeatWeeks`, franjas para hoy (F12, F14).
 
+## ✅ Hecho: pulido
+
+- Validación con `zod`, logger `pino`, Docker (`Dockerfile`, `docker-compose.yml`, `/health`, apagado ordenado) y un job de CI que arranca la API con una MongoDB real.
+
 ## Siguiente · Completar el producto mínimo
 
 
 ## Calidad y despliegue
 
-- [ ] Validación de entrada con `zod`.
-- [ ] ESLint + Prettier; logger (`pino`) en lugar de `console.log`.
-- [ ] Dockerfile + `docker-compose.yml` (API + Mongo).
+- [ ] ESLint + Prettier.
 - [ ] Documentación OpenAPI/Swagger.
 
 ## Frontend

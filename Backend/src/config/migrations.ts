@@ -3,6 +3,7 @@ import Schedule from '../models/Schedule';
 import User from '../models/User';
 import { getAppTimezone } from './env';
 import { slotStart } from '../services/scheduleService';
+import { logger } from '../utils/logger';
 
 /**
  * Se ejecuta en cada arranque, después de conectar a MongoDB. Es idempotente.
@@ -16,13 +17,13 @@ import { slotStart } from '../services/scheduleService';
 export const runMigrations = async (): Promise<void> => {
   const fixed = await Appointment.updateMany({ state: 'cancelled' }, { $set: { state: 'cancelada' } });
   if (fixed.modifiedCount > 0) {
-    console.log(`[migración] ${fixed.modifiedCount} cita(s) 'cancelled' → 'cancelada'`);
+    logger.info(`Migración: ${fixed.modifiedCount} cita(s) 'cancelled' → 'cancelada'`);
   }
   await Appointment.syncIndexes();
 
   const users = await User.updateMany({ timezone: { $exists: false } }, { $set: { timezone: getAppTimezone() } });
   if (users.modifiedCount > 0) {
-    console.log(`[migración] ${users.modifiedCount} usuario(s) con zona horaria ${getAppTimezone()}`);
+    logger.info(`Migración: ${users.modifiedCount} usuario(s) con zona horaria ${getAppTimezone()}`);
   }
 
   let migratedSchedules = 0;
@@ -45,6 +46,6 @@ export const runMigrations = async (): Promise<void> => {
   }
   await flush();
   if (migratedSchedules > 0) {
-    console.log(`[migración] ${migratedSchedules} franja(s) con startsAt`);
+    logger.info(`Migración: ${migratedSchedules} franja(s) con startsAt`);
   }
 };

@@ -10,6 +10,7 @@ import { updateAvailabilitySchedule } from './scheduleService';
 import { assertValidPassword } from '../utils/password';
 import { assertValidTimeZone } from '../utils/timezone';
 import { formatAppointmentDate } from '../utils/dates';
+import { logger } from '../utils/logger';
 
 /** Campos visibles de un psicólogo para cualquier usuario autenticado. */
 const PUBLIC_PSYCHOLOGIST_FIELDS = 'name role studies description';
@@ -29,7 +30,7 @@ export const getUserService = async (id: string): Promise<IUser | null> => {
 export const getPublicPsychologistService = async (id: string): Promise<IUser | null> => {
   return User.findOne({ _id: id, role: 'psicologo', isActive: { $ne: false }, ...NOT_DELETED }).select(
     PUBLIC_PSYCHOLOGIST_FIELDS
-  );
+ );
 };
 
 /**
@@ -71,7 +72,7 @@ const notifyCancellation = async (counterpartId: unknown, time: Date): Promise<v
     const { date, hour } = formatAppointmentDate(time, counterpart.timezone);
     await sendEmail('appointmentCancelled', counterpart.email, counterpart.name, date, hour);
   } catch (error) {
-    console.error('Error al avisar de una cita cancelada:', error);
+    logger.error({ err: error }, 'Error al avisar de una cita cancelada'); 
   }
 };
 
@@ -117,7 +118,7 @@ export const deleteUserService = async (id: string): Promise<IUser | null> => {
       },
       $unset: { description: '', passwordResetTokenHash: '', passwordResetExpires: '' },
     }
-  );
+ );
 
   // 2. Citas pendientes
   const pending = await Appointment.find({

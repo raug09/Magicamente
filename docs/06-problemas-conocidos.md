@@ -22,12 +22,9 @@ No hay problemas de seguridad abiertos conocidos. Límites a tener en cuenta:
 
 ### Deuda técnica
 
-- Sin validación de entrada declarativa (sugerencia: `zod`); hoy hay validaciones a mano en los controladores.
 - Sin linter/formatter.
-- Sin logger (`pino`); quedan algunos `console.log` sueltos.
 - Nombre de archivo inconsistente: `models/appointment.ts` frente a `User.ts` y `Schedule.ts`.
 - Mezcla de idiomas en mensajes de respuesta (inglés y español).
-- El email no se normaliza (mayúsculas/espacios).
 
 ## Resueltos
 
@@ -66,6 +63,10 @@ No hay problemas de seguridad abiertos conocidos. Límites a tener en cuenta:
 | F12 | Imposible crear franjas para hoy | Se compara el instante real (`startsAt`) con ahora: se puede crear para hoy si no ha empezado |
 | F14 | Todo se interpretaba en UTC | `timezone` por usuario, `startsAt` (instante real) en franjas y citas, conversión con horario de verano, correos en la zona del destinatario y migración de datos antiguos |
 | — | Campo `recurrent` sin lógica | Sustituido por `repeatWeeks` en `POST /schedule` (franjas semanales a la misma hora local) |
+| — | Validación de entrada a mano y dispersa en los controladores | Esquemas `zod` por endpoint (`validation/`), con `errors` por campo; los campos desconocidos se descartan |
+| — | `console.log` sueltos y sin control | `pino` (JSON, `LOG_LEVEL`, sin datos personales ni credenciales) y un registro por petición |
+| — | El email no se normalizaba | Minúsculas y sin espacios (esquema y modelo) |
+| — | Sin Docker ni comprobación del arranque real | `Dockerfile`, `docker-compose.yml`, `/health`, apagado ordenado y un job de CI que levanta todo con una MongoDB real |
 | — | Sin tests ni CI | Vitest + Supertest + MongoDB en memoria; workflow de GitHub Actions |
 | F1 | “Mis citas” siempre devolvía 403 (roles en inglés) y respondía dos veces | Roles `paciente`/`psicologo`, `asyncHandler`; el populate ya no expone contraseñas ni emails ajenos; ordenado por fecha |
 | F4 | Cancelar guardaba `'cancelled'` (fuera del enum) | Guarda `'cancelada'` con validación; migración de los datos antiguos al arrancar |

@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import { isAuthenticated, isAdmin, isSelfOrAdmin } from '../middlewares/auth';
 import { asyncHandler } from '../middlewares/asyncHandler';
+import { validate } from '../validation/validate';
+import { updateUserSchema } from '../validation/schemas';
 import { getUser, updateUser, deleteUser, listUsers } from '../controllers/userController';
 
 const router = Router();
@@ -12,7 +14,7 @@ router.get('/', isAuthenticated, isAdmin, asyncHandler(listUsers));
 router.get('/:id', isAuthenticated, asyncHandler(getUser));
 
 // Solo la propia cuenta o un administrador.
-router.put('/:id', isAuthenticated, isSelfOrAdmin(), asyncHandler(updateUser));
+router.put('/:id', isAuthenticated, isSelfOrAdmin(), validate({ body: updateUserSchema }), asyncHandler(updateUser));
 router.delete('/:id', isAuthenticated, isSelfOrAdmin(), asyncHandler(deleteUser));
 
 export default router;

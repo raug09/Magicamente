@@ -1,6 +1,7 @@
 import { Resend } from 'resend';
 import { emailTemplates, EmailTemplateName } from '../config/emailTemplates';
 import { getEmailFrom, getResendApiKey } from '../config/env';
+import { logger } from '../utils/logger';
 
 let resendClient: Resend | null = null;
 
@@ -29,7 +30,7 @@ export const sendEmail = async <T extends EmailTemplateName>(
 
   const resend = getResend();
   if (!resend) {
-    console.warn(`[email] RESEND_API_KEY no definido; no se envía "${subject}" a ${to}`);
+    logger.warn(`Email: RESEND_API_KEY no definido; no se envía "${subject}"`); // sin la dirección: son datos personales
     return null;
   }
 

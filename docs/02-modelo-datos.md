@@ -15,6 +15,7 @@ erDiagram
     string password "hash bcrypt"
     string role "paciente | psicologo | administrador"
     bool isActive
+    string timezone
     string[] studies
     string description
     ObjectId[] schedules
@@ -24,9 +25,10 @@ erDiagram
     ObjectId _id
     ObjectId psychologist
     Date day
-    string hour "HH:mm"
+    string hour "HH:mm, hora del psicólogo"
+    string timezone
+    Date startsAt "instante real UTC"
     bool isAvailable
-    bool recurrent
     Date createdAt
   }
   APPOINTMENT {
@@ -35,7 +37,7 @@ erDiagram
     ObjectId psychologistId
     ObjectId scheduleId "único entre citas vivas"
     string state "pendiente | completada | cancelada"
-    Date time "día + hora en UTC"
+    Date time "instante real UTC"
     string hour
     bool reminderSent
   }

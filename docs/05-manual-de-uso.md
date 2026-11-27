@@ -27,12 +27,29 @@ Edita `Backend/.env`:
 | `APP_TIMEZONE` | no | `UTC` | Zona horaria **por defecto de las cuentas nuevas** (cada usuario puede tener la suya) |
 | `CORS_ORIGIN` | no | solo `FRONTEND_URL` | Orígenes web autorizados (lista separada por comas, o `*`) |
 | `TRUST_PROXY` | detrás de un proxy | sin definir | Nº de proxies delante del servidor (p. ej. `1` en Render, Railway, Heroku o Nginx). **Ponlo si despliegas detrás de un proxy**: si no, el límite de intentos vería la IP del proxy y bloquearía a todos a la vez |
+| `LOG_LEVEL` | no | `info` | `trace`, `debug`, `info`, `warn`, `error`, `fatal` o `silent` |
 | `FRONTEND_URL` | para recuperar contraseña | `http://localhost:5173` | URL base del frontend; el correo enlaza a `<FRONTEND_URL>/reset-password?token=...` |
+
+## Ejecución con Docker (API + MongoDB)
+
+No necesitas instalar Node ni MongoDB; solo Docker.
+
+```bash
+cp .env.example .env        # en la RAÍZ del repositorio; rellena al menos JWT_SECRET
+docker compose up --build   # API en http://localhost:3000
+curl http://localhost:3000/health     # {"status":"ok","db":"up"}
+```
+
+- `docker compose up -d` lo deja en segundo plano; `docker compose logs -f api` muestra los logs; `docker compose down` lo para (los datos de MongoDB se conservan en el volumen `mongo-data`; `docker compose down -v` también los borra).
+- MongoDB **no se publica** fuera de Docker: solo la API puede hablar con ella. Para abrir `mongosh`: `docker compose exec mongo mongosh magicamente`.
+- La imagen se ejecuta como usuario no root, tiene un healthcheck (`/health`) y al parar (`docker compose stop`) se apaga de forma ordenada.
+- El `docker-compose.yml` es una base razonable para un servidor propio. Detrás de un proxy (Nginx, Traefik…), pon `TRUST_PROXY=1` y sirve el HTTPS en el proxy.
 
 ## Ejecución
 
 ```bash
 npm run dev                  # desarrollo con recarga automática
+npm run dev:pretty           # igual, con los logs legibles
 npm run build && npm start   # producción (compila a dist/)
 ```
 
@@ -135,6 +152,8 @@ Sin `RESEND_API_KEY` verás en consola `[email] RESEND_API_KEY no definido; no s
 | `No se pudo iniciar el servidor: ... ECONNREFUSED` | `MONGO_URI` incorrecta o Mongo no está arrancado |
 | `400 El enlace no es válido o ha caducado` | El token ya se usó, pasó más de 1 hora, o se pidió un enlace más reciente (invalida el anterior) |
 | No llega el correo de recuperación | Falta `RESEND_API_KEY`, la cuenta está desactivada, o se pidió hace menos de 1 minuto |
+| `400` con `errors: [...]` | La entrada no cumple el esquema; cada elemento indica el `field` y el motivo |
+| `docker compose up` dice que falta `JWT_SECRET` | Crea `.env` en la raíz del repositorio (copia `.env.example`) |
 | `429 Demasiadas peticiones` | Superaste un límite por IP (login: 10 fallos/15 min; registro, forgot y reset: 10/hora; API: 300/15 min). Mira `Retry-After` |
 | `401 La sesión ha caducado: vuelve a iniciar sesión` | Cambiaste o restableciste la contraseña después de emitir ese token |
 | `401 La cuenta no existe o está desactivada` | Cuenta borrada o con `isActive: false` |

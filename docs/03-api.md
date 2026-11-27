@@ -2,7 +2,7 @@
 
 Base: `http://localhost:3000` · Formato: JSON · Autenticación: cabecera `Authorization: Bearer <token>` donde se indica 🔒.
 
-**Errores comunes a toda la API:** `401` sin sesión, con token inválido/caducado, o si la cuenta fue borrada o desactivada; `429` si se superan los límites de intentos (ver [arquitectura](01-arquitectura.md#protección-del-servidor)). Los errores responden `{ "message": "..." }` con un código HTTP adecuado (400 datos no válidos o id mal formado, 401 sin sesión, 403 sin permiso, 404 no existe, 409 duplicado). Ver [01 · Arquitectura](01-arquitectura.md#manejo-de-errores).
+**Errores comunes a toda la API:** `401` sin sesión, con token inválido/caducado, o si la cuenta fue borrada o desactivada; `429` si se superan los límites de intentos (ver [arquitectura](01-arquitectura.md#protección-del-servidor)). Los errores responden `{ "message": "..." }` (los de validación añaden `"errors": [{ "field", "message" }]` con **todos** los campos inválidos) con un código HTTP adecuado (400 datos no válidos o id mal formado, 401 sin sesión, 403 sin permiso, 404 no existe, 409 duplicado). Ver [01 · Arquitectura](01-arquitectura.md#manejo-de-errores).
 
 Leyenda: ✅ funciona · ⚠️ funciona con salvedades · ❌ roto (detalles en [06 · Problemas conocidos](06-problemas-conocidos.md)).
 
@@ -10,7 +10,8 @@ Leyenda: ✅ funciona · ⚠️ funciona con salvedades · ❌ roto (detalles en
 
 | Método | Ruta | Quién | Descripción | Estado |
 |---|---|---|---|---|
-| GET | `/` | todos | Comprobación de vida | ✅ |
+| GET | `/` | todos | Comprobación de vida (texto) | ✅ |
+| GET | `/health` | todos | 200 `{status:"ok",db:"up"}` si la base de datos responde; 503 si no | ✅ |
 | POST | `/api/auth/register` | todos | Registro (paciente o psicólogo) | ✅ |
 | POST | `/api/auth/login` | todos | Login, devuelve JWT | ✅ |
 | GET | `/api/auth/me` | 🔒 | Usuario de la sesión actual | ✅ |
@@ -53,6 +54,8 @@ Los antiguos `POST /api/email/send-test` y `GET /api/notifications/test` se **el
 - `role` opcional: `paciente` (por defecto) o `psicologo`. Cualquier otro valor, incluido `administrador` → `400`.
 - `timezone` opcional: zona IANA (p. ej. `"America/Bogota"`); por defecto `UTC`; `400` si no es válida.
 - `password`: entre 8 caracteres y 72 bytes → si no, `400`.
+- Límites: `name` ≤ 100 caracteres, `email` con formato válido (≤ 254), `studies` lista de textos (≤ 30 elementos de ≤ 200 caracteres).
+- **El email se normaliza** (sin espacios y en minúsculas): `Ana@Example.com` = `ana@example.com`, en el registro, el login y la recuperación.
 - `name`, `email`, `password` obligatorios → si faltan, `400`. `studies` debe ser una lista de textos.
 - Email ya usado → `409`.
 - Tras guardar intenta enviar el correo `confirmation`; si falla, solo lo registra en el log.

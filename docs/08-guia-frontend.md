@@ -11,7 +11,7 @@ Documento pensado para quien construya el frontend (persona o sesión de Claude)
 | Base | `http://localhost:3000` en desarrollo. Todas las rutas empiezan por `/api` |
 | Formato | JSON en ambos sentidos (`Content-Type: application/json`) |
 | CORS | El backend **solo** acepta el origen configurado en `FRONTEND_URL` (por defecto `http://localhost:5173`, el puerto de Vite) o en `CORS_ORIGIN`. Si el frontend corre en otra dirección, hay que cambiar esa variable en `Backend/.env` |
-| Errores | Siempre `{ "message": "texto en español" }` (algunos 400 de validación añaden `"errors": [campos]`) |
+| Errores | Siempre `{ "message": "texto en español" }`. Los `400` de validación añaden `"errors": [{ "field": "email", "message": "…" }, …]` con **todos** los campos inválidos: úsalo para marcar cada campo del formulario (`message` es el primero, para un aviso general) |
 
 ## 2. Sesión y autenticación
 
@@ -230,6 +230,11 @@ POST /api/schedule  { "day": "2026-12-15", "hour": "10:00", "repeatWeeks": 8 }
 Ya se pueden crear franjas para **hoy** (en el calendario del psicólogo) siempre que su hora no haya empezado. Una franja ya empezada nunca se puede reservar: `GET /schedule/:id?available=true` ya la excluye.
 
 ## 7. Detalles que conviene saber
+
+- **El email se normaliza** (sin espacios, en minúsculas): el frontend puede enviarlo como lo escriba el usuario y mostrar el que devuelve el servidor.
+- **Límites de los campos** (el servidor responde 400 si no se cumplen, conviene validarlos también en el formulario): `name` ≤ 100 caracteres; `email` con formato válido; `password` 8 caracteres–72 bytes; `studies` ≤ 30 elementos de ≤ 200 caracteres; `description` ≤ 2000; `repeatWeeks` 1–26.
+- Los campos que el servidor no espera se **ignoran** sin error (excepto al editar un usuario, una franja o una cita: ahí un campo que no puedes cambiar da `403`).
+- `GET /health` sirve para comprobar que la API y su base de datos responden (útil para una pantalla de “servicio no disponible”).
 
 - Los `_id` son cadenas de 24 caracteres hexadecimales; si pasas otro formato, recibes `400`.
 - `GET /api/users` (listado completo) es solo para administradores. Los pacientes encuentran psicólogos con `/api/psychologists`.

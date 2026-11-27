@@ -5,7 +5,7 @@ import { AppError } from '../utils/AppError';
 export const scheduleAppointment = async (req: Request, res: Response) => {
   const appointment = await appointmentService.scheduleAppointment({
     patientId: req.user!.id,
-    scheduleId: req.body?.scheduleId,
+    scheduleId: req.body.scheduleId,
   });
   res.status(201).json({ message: 'Cita agendada correctamente', appointment });
 };
@@ -30,7 +30,7 @@ export const getAppointments = async (req: Request, res: Response) => {
 
 /** Único cambio de estado permitido aquí: marcar la cita como completada. */
 export const updateAppointment = async (req: Request, res: Response) => {
-  const body = req.body ?? {};
+  const body = req.body;
   const forbidden = Object.keys(body).filter((key) => key !== 'state');
   if (forbidden.length > 0) {
     throw new AppError(403, `No puedes modificar: ${forbidden.join(', ')}`);

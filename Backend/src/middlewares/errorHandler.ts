@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import mongoose from 'mongoose';
 import { AppError } from '../utils/AppError';
+import { logger } from '../utils/logger';
 
 export const notFoundHandler = (req: Request, res: Response): void => {
   res.status(404).json({ message: 'Ruta no encontrada' });
@@ -10,7 +11,7 @@ export const notFoundHandler = (req: Request, res: Response): void => {
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 export const errorHandler = (err: unknown, req: Request, res: Response, next: NextFunction): void => {
   if (err instanceof AppError) {
-    res.status(err.status).json({ message: err.message });
+    res.status(err.status).json(err.details ? { message: err.message, errors: err.details } : { message: err.message });
     return;
   }
   if (err instanceof mongoose.Error.CastError) {
@@ -30,6 +31,6 @@ export const errorHandler = (err: unknown, req: Request, res: Response, next: Ne
     return;
   }
 
-  console.error('Error no controlado:', err);
+  logger.error({ err, method: req.method, url: req.originalUrl }, 'Error no controlado');
   res.status(500).json({ message: 'Error interno del servidor' });
 };

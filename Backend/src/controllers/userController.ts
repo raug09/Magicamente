@@ -26,7 +26,7 @@ export const getUser = async (req: Request, res: Response) => {
 };
 
 export const updateUser = async (req: Request, res: Response) => {
-  const updatedUser = await updateUserService(req.params.id, req.body ?? {}, req.user!.role);
+  const updatedUser = await updateUserService(req.params.id, req.body, req.user!.role);
   if (!updatedUser) {
     throw new AppError(404, 'Usuario no encontrado');
   }

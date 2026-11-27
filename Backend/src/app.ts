@@ -1,6 +1,8 @@
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
+import mongoose from 'mongoose';
+import pinoHttp from 'pino-http';
 import authRoutes from './routes/auth';
 import userRoutes from './routes/user';
 import appointmentRoutes from './routes/appointment';
@@ -9,6 +11,7 @@ import psychologistRoutes from './routes/psychologist';
 import { errorHandler, notFoundHandler } from './middlewares/errorHandler';
 import { createRateLimiters } from './middlewares/rateLimiters';
 import { getCorsOrigins, getTrustProxy } from './config/env';
+import { logger } from './utils/logger';
 
 export interface AppOptions {
   /** Límite de intentos por IP. Activado por defecto; los tests lo desactivan salvo los suyos. */
@@ -22,6 +25,19 @@ export const createApp = ({ rateLimit = true }: AppOptions = {}) => {
   const trustProxy = getTrustProxy();
   if (trustProxy !== undefined) app.set('trust proxy', trustProxy);
 
+  // Un registro por petición: método, ruta (SIN la query, que puede llevar datos personales), estado y duración.
+  // No se registran cabeceras ni cuerpos, así que no aparecen tokens ni contraseñas.
+  app.use(
+    pinoHttp({
+      logger,
+      autoLogging: { ignore: (req) => req.url === '/health' },
+      customLogLevel: (_req, res, error) => (error || res.statusCode >= 500 ? 'error' : res.statusCode >= 400 ? 'warn' : 'info'),
+      serializers: {
+        req: (req) => ({ id: req.id, method: req.method, url: String(req.url).split('?')[0] }),
+        res: (res) => ({ statusCode: res.statusCode }),
+      },
+    })
+  );
   app.use(helmet());
   app.use(cors({ origin: getCorsOrigins() === '*' ? true : getCorsOrigins() }));
   app.use(express.json({ limit: '100kb' }));
@@ -37,6 +53,12 @@ export const createApp = ({ rateLimit = true }: AppOptions = {}) => {
 
   app.get('/', (req, res) => {
     res.send('Servidor corriendo y conectado a MongoDB');
+  });
+
+  // Para balanceadores y Docker: 200 si la base de datos responde, 503 si no.
+  app.get('/health', (req, res) => {
+    const dbUp = mongoose.connection.readyState === 1;
+    res.status(dbUp ? 200 : 503).json({ status: dbUp ? 'ok' : 'error', db: dbUp ? 'up' : 'down' });
   });
 
   app.use('/api/auth', authRoutes);

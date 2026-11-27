@@ -3,6 +3,7 @@ import Appointment from '../models/appointment';
 import User from '../models/User';
 import { sendEmail } from '../services/emailService';
 import { formatAppointmentDate } from '../utils/dates';
+import { logger } from '../utils/logger';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -32,7 +33,7 @@ export const sendAppointmentReminders = async (now = new Date()): Promise<number
     try {
       const patient = await User.findById(appointment.patientId);
       if (!patient) {
-        console.warn(`[recordatorios] Paciente ${appointment.patientId} no encontrado (cita ${_id})`);
+        logger.warn({ appointmentId: String(_id), patientId: String(appointment.patientId) }, 'Recordatorios: paciente no encontrado');
         continue;
       }
       const { date, hour } = formatAppointmentDate(appointment.time, patient.timezone);
@@ -41,20 +42,20 @@ export const sendAppointmentReminders = async (now = new Date()): Promise<number
     } catch (error) {
       // Se libera para reintentarlo en la siguiente ejecución.
       await Appointment.updateOne({ _id }, { reminderSent: false });
-      console.error(`[recordatorios] Error con la cita ${_id}:`, error);
+      logger.error({ err: error, appointmentId: String(_id) }, 'Recordatorios: error al procesar la cita');
     }
   }
   return sent;
 };
 
 /** Programa los recordatorios: al minuto 0 de cada hora. */
-export const startCronJobs = (): void => {
-  cron.schedule('0 * * * *', async () => {
+export const startCronJobs = () => {
+  return cron.schedule('0 * * * *', async () => {
     try {
       const sent = await sendAppointmentReminders();
-      if (sent > 0) console.log(`[recordatorios] ${sent} recordatorio(s) enviado(s)`);
+      if (sent > 0) logger.info(`Recordatorios: ${sent} enviado(s)`);
     } catch (error) {
-      console.error('[recordatorios] Error al ejecutar el cron:', error);
+      logger.error({ err: error }, 'Recordatorios: error al ejecutar el cron');
     }
   });
 };
