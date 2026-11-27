@@ -54,6 +54,7 @@ Prioridad: 🔴 crítico · 🟠 importante · 🟡 menor.
 | — | `@types/express@5` con Express 4, `ts-node-dev` en dependencies | Corregido |
 | — | Resend fallaba al arrancar sin API key | Cliente perezoso; sin key se avisa en consola |
 | F8 | Los pacientes no podían descubrir psicólogos | `GET /api/psychologists` con búsqueda por nombre, paginación y solo campos públicos |
+| — | `GET /schedule/:id` devolvía todas las franjas sin orden ni filtros, y no se podían editar ni borrar | Filtros `available`, `from`, `to`, orden por fecha, y `PUT`/`DELETE` de franjas libres (propias o admin) |
 | — | Sin tests ni CI | Vitest + Supertest + MongoDB en memoria; workflow de GitHub Actions |
 | F1 | “Mis citas” siempre devolvía 403 (roles en inglés) y respondía dos veces | Roles `paciente`/`psicologo`, `asyncHandler`; el populate ya no expone contraseñas ni emails ajenos; ordenado por fecha |
 | F4 | Cancelar guardaba `'cancelled'` (fuera del enum) | Guarda `'cancelada'` con validación; migración de los datos antiguos al arrancar |

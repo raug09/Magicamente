@@ -1,6 +1,6 @@
 import Appointment, { IAppointment } from '../models/appointment';
 import Schedule from '../models/Schedule';
-import { updateAvailabilitySchedule } from './scheduleService';
+import { slotStart, updateAvailabilitySchedule } from './scheduleService';
 import { AuthUser } from '../middlewares/auth';
 import { AppError } from '../utils/AppError';
 
@@ -21,14 +21,6 @@ export const getOwnedAppointment = async (appointmentId: string, user: AuthUser)
   return appointment;
 };
 
-/** Fecha y hora (UTC) de una franja: `day` con la hora `HH:mm` aplicada. */
-const scheduleDateTime = (day: Date, hour: string): Date => {
-  const [hours, minutes] = hour.split(':').map(Number);
-  const time = new Date(day);
-  time.setUTCHours(hours, minutes, 0, 0);
-  return time;
-};
-
 /**
  * Reserva una franja. El paciente sale del token y el psicólogo de la propia franja:
  * el cliente solo elige `scheduleId`. Los errores se lanzan como `AppError`.
@@ -46,7 +38,7 @@ export const scheduleAppointment = async ({ patientId, scheduleId }: { patientId
     throw new AppError(409, 'Este horario ya está ocupado.');
   }
 
-  const appointmentTime = scheduleDateTime(schedule.day, schedule.hour);
+  const appointmentTime = slotStart(schedule.day, schedule.hour);
   if (appointmentTime < new Date()) {
     throw new AppError(400, 'No puedes agendar citas en fechas pasadas.');
   }

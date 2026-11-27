@@ -29,6 +29,8 @@ No hay verificación de email, recuperación de contraseña (existe la plantilla
 
 Cada franja es un hueco único (una fecha y una hora). El campo `recurrent` existe pero no genera franjas repetidas.
 
+**Gestionar franjas ya publicadas:** el psicólogo puede cambiar el día o la hora (`PUT /api/schedule/:id`) o borrarla (`DELETE`), **solo si está libre**. Si un paciente la reservó, el psicólogo debe cancelar antes la cita. Ambas operaciones están condicionadas a `isAvailable: true` en la propia escritura, así que una reserva simultánea nunca queda con la franja modificada o borrada.
+
 ## 3. Reservar una cita (paciente)
 
 ```mermaid
@@ -53,7 +55,7 @@ La reserva es atómica: la franja se marca ocupada con una sola operación condi
 
 **¿Cómo encuentra el paciente a un psicólogo?**
 1. `GET /api/psychologists?q=ana` → lista de psicólogos activos (nombre, estudios y descripción).
-2. `GET /api/schedule/:id` con el `_id` elegido → sus franjas; el cliente se queda con las de `isAvailable: true`.
+2. `GET /api/schedule/:id?available=true` con el `_id` elegido → solo sus franjas libres y futuras, ordenadas (también acepta `from` y `to`).
 3. `POST /api/appointments/appointment` con el `scheduleId`.
 
 ## 4. Ver, cancelar y completar

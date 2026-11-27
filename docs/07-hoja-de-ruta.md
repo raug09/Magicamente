@@ -23,9 +23,12 @@ Las referencias (S1, F2…) apuntan a [06 · Problemas conocidos](06-problemas-c
 
 - `GET /api/psychologists` con búsqueda por nombre, paginación y solo campos públicos.
 
+## ✅ Hecho: gestión de franjas
+
+- `GET /api/schedule/:id` con `available`, `from`, `to` y orden por fecha; `PUT`/`DELETE` de franjas libres.
+
 ## Siguiente · Completar el producto mínimo
 
-- [ ] `GET /api/schedule/:id?from=&available=true` con filtros; `PUT`/`DELETE` de franjas (solo si no hay cita).
 - [ ] `GET /api/auth/me` para que el frontend obtenga el usuario sin decodificar el JWT.
 - [ ] Recuperación de contraseña (la plantilla `resetPassword` ya existe).
 - [ ] Decidir la estrategia de zonas horarias (F14) y franjas para hoy (F12).

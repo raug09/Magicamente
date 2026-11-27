@@ -19,7 +19,9 @@ Leyenda: ✅ funciona · ⚠️ funciona con salvedades · ❌ roto (detalles en
 | DELETE | `/api/users/:id` | 🔒 uno mismo o admin | Borrar usuario | ⚠️ no borra en cascada |
 | POST | `/api/schedule` | 🔒 psicólogo o admin | Crear franja horaria | ✅ |
 | GET | `/api/psychologists` | 🔒 | Listado de psicólogos (búsqueda y paginación) | ✅ |
-| GET | `/api/schedule/:psychologistId` | 🔒 | Franjas de un psicólogo | ✅ |
+| GET | `/api/schedule/:psychologistId` | 🔒 | Franjas de un psicólogo (con filtros) | ✅ |
+| PUT | `/api/schedule/:id` | 🔒 su psicólogo o admin | Cambiar día/hora de una franja libre | ✅ |
+| DELETE | `/api/schedule/:id` | 🔒 su psicólogo o admin | Borrar una franja libre | ✅ |
 | GET | `/api/appointments/appointment` | 🔒 paciente o psicólogo | Mis citas | ✅ |
 | POST | `/api/appointments/appointment` | 🔒 paciente | Reservar cita | ✅ |
 | PATCH | `/api/appointments/appointment/cancel/:id` | 🔒 participante o admin | Cancelar cita | ✅ |
@@ -130,7 +132,41 @@ Como administrador hay que añadir `"psychologist": "<idPsicologo>"`.
 - `201 { "message": "Horario creado exitosamente", "schedule": {...} }`.
 
 ### `GET /api/schedule/:psychologistId` 🔒
-Array con **todas** las franjas del psicólogo (pasadas y ocupadas incluidas). Filtra por `isAvailable` en el cliente.
+
+Franjas de un psicólogo, **ordenadas por día y hora**. Filtros opcionales:
+
+| Parámetro | Descripción |
+|---|---|
+| `available=true` | Solo franjas **libres y futuras** (las que se pueden reservar ahora). Una franja libre cuya hora ya pasó no se incluye |
+| `available=false` | Solo las ocupadas |
+| `from=YYYY-MM-DD` | Desde ese día, incluido |
+| `to=YYYY-MM-DD` | Hasta ese día, incluido |
+
+Ejemplo: `GET /api/schedule/6740...?available=true&from=2026-12-01&to=2026-12-31`
+
+- Sin parámetros devuelve todas (pasadas y ocupadas incluidas).
+- `400` si `available` no es `true`/`false`, si las fechas no tienen formato `YYYY-MM-DD` o si `from` es posterior a `to`, o si el id está mal formado.
+- Un psicólogo que no existe devuelve `[]`.
+
+### `PUT /api/schedule/:id` 🔒 su psicólogo o admin
+
+Cambia el día y/o la hora de una franja **libre**.
+
+```json
+{ "hour": "12:30" }
+```
+
+- Campos permitidos: `day` y `hour` (mismas validaciones que al crear). Cualquier otro → `403`; ninguno → `400`.
+- `403` si la franja es de otro psicólogo (un administrador puede con cualquiera) · `404` si no existe.
+- `409` si ya hay otra franja del psicólogo en ese día y hora, o si la franja tiene una cita reservada (hay que cancelar la cita primero).
+- `200 { "message": "Horario actualizado", "schedule": {...} }`.
+
+### `DELETE /api/schedule/:id` 🔒 su psicólogo o admin
+
+Borra una franja **libre** y la quita de la lista del psicólogo.
+
+- `200 { "message": "Horario eliminado" }` · `403` / `404` como arriba.
+- `409` si tiene una cita reservada. Una franja cuya cita se canceló vuelve a ser libre y se puede borrar.
 
 ## Citas
 

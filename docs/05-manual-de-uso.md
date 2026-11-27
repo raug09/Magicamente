@@ -73,7 +73,7 @@ SCHEDULE_ID=$(curl -s -X POST $API/api/schedule -H "Authorization: Bearer $PSI_T
 
 # 5. El paciente busca psicólogos, y mira las franjas del elegido
 curl -s "$API/api/psychologists?q=ana" -H "Authorization: Bearer $PAC_TOKEN"
-curl -s $API/api/schedule/$PSI_ID -H "Authorization: Bearer $PAC_TOKEN"
+curl -s "$API/api/schedule/$PSI_ID?available=true" -H "Authorization: Bearer $PAC_TOKEN"
 
 # 6. Reservar: solo hace falta el scheduleId
 APPOINTMENT_ID=$(curl -s -X POST $API/api/appointments/appointment -H "Authorization: Bearer $PAC_TOKEN" \
@@ -118,6 +118,7 @@ Sin `RESEND_API_KEY` verás en consola `[email] RESEND_API_KEY no definido; no s
 | `401 Token no válido` | El token caducó (1 h) o `JWT_SECRET` cambió desde que se emitió |
 | `403` al editar un usuario | Solo puedes editar tu cuenta, y solo `name`, `description`, `studies`, `password` |
 | `403` al crear un horario | Solo los psicólogos (para sí mismos) o los administradores |
+| `409` al modificar o borrar una franja | Tiene una cita reservada: cancélala antes |
 | `409` al reservar | La franja ya está ocupada, o ya tienes otra cita a esa hora |
 | `400` al cancelar | La cita ya no está `pendiente` (ya cancelada o completada) |
 | `npm test` se queda descargando o falla con `fastdl.mongodb.org` | Sin acceso a internet o host bloqueado por la red |
