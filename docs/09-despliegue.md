@@ -8,7 +8,7 @@ Guía para publicar Magicamente con servicios gratuitos y poder enseñarlo y pro
 
 | Pieza | Servicio | Coste previsto |
 |---|---|---|
-| Frontend (`Frontend/`) | Cloudflare Pages | Gratis |
+| Frontend (`Frontend/`) | Cloudflare (Workers, sitio estático) | Gratis |
 | Backend (`Backend/`, imagen Docker) | Render, plan gratuito | Gratis; **se duerme tras 15 min sin tráfico** y tarda ~1 min en despertar |
 | Base de datos | MongoDB Atlas, clúster M0 (512 MB) | Gratis |
 | Documentos de verificación | Cloudflare R2 (ya creado) | Gratis dentro del nivel gratuito |
@@ -49,16 +49,20 @@ El orden importa, porque cada pieza necesita la dirección de la anterior: **1) 
    La documentación Swagger (`/api/docs`) queda **desactivada** en producción por defecto.
 5. Despliega. Cuando termine, abre `https://<tu-servicio>.onrender.com/health`. Debe responder `{"status":"ok","db":"up"}`. La primera vez puede tardar hasta un minuto.
 
-## 3. Frontend (Cloudflare Pages)
+## 3. Frontend (Cloudflare)
 
-1. En Cloudflare: **Workers & Pages → Create → Pages → Connect to Git**, elige el repositorio y la misma rama.
-2. Configuración de compilación:
-   - **Root directory:** `Frontend`
-   - **Build command:** `npm run build`
-   - **Build output directory:** `dist`
-   - **Variable de entorno:** `VITE_API_URL` = `https://<tu-servicio>.onrender.com` (sin `/` final).
-3. Despliega. Obtendrás una dirección `https://<nombre>.pages.dev`.
-4. Las rutas de la app (`/citas`, `/psicologos/…`) funcionan al recargar gracias a `Frontend/public/_redirects`.
+Cloudflare publica ahora los sitios estáticos con su flujo de **Workers** (importar un repositorio). La configuración está en `Frontend/wrangler.jsonc`: carpeta de salida `dist` y modo «aplicación de una sola página», para que `/citas` o `/psicologos/…` no den 404 al recargar.
+
+1. En Cloudflare: **Workers & Pages → Create → Import a repository** (o «Conectar con Git»), elige `raug09/Magicamente`.
+2. **Nombre del proyecto:** `magicamente`. Tiene que ser **igual** al `name` de `Frontend/wrangler.jsonc`; si lo cambias, cambia también ese archivo.
+3. **Comando de compilación:** `npm run build`. **Implementar comando:** déjalo en `npx wrangler deploy`.
+4. Abre **Configuración avanzada** y rellena:
+   - **Directorio raíz:** `Frontend`
+   - **Rama de producción:** la rama que despliegas (mientras el trabajo siga sin fusionarse, `ccr-5a742e1c-qu0a4h`; la principal aún no tiene el frontend).
+   - **Variables de compilación** (no las «de ejecución»): `VITE_API_URL` = `https://<tu-servicio>.onrender.com`, sin `/` al final. Vite la incrusta al compilar, así que si la cambias hay que volver a desplegar.
+5. Pulsa **Implementar**. Obtendrás una dirección `https://magicamente.<tu-subdominio>.workers.dev`.
+
+Si no ves la rama de producción al crearlo, está después en **Configuración → Compilaciones → Control de ramas**.
 
 ## 4. Conectar frontend y backend
 
@@ -66,7 +70,7 @@ En Render, añade o corrige y vuelve a desplegar:
 
 | Variable | Valor |
 |---|---|
-| `FRONTEND_URL` | `https://<nombre>.pages.dev` (sin `/` final). Los correos enlazan a esta dirección. |
+| `FRONTEND_URL` | la dirección de Cloudflare (`https://magicamente.….workers.dev`) (sin `/` final). Los correos enlazan a esta dirección. |
 | `CORS_ORIGIN` | La misma dirección. Si no coincide **exactamente**, el navegador bloqueará las peticiones. |
 
 ## 5. Primer administrador
