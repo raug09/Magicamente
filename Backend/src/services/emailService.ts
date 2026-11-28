@@ -1,38 +1,42 @@
-import { emailTemplates } from "../config/emailTemplates";
-import { Resend } from "resend";
+import { Resend } from 'resend';
+import { emailTemplates, EmailTemplateName } from '../config/emailTemplates';
+import { getEmailFrom, getResendApiKey } from '../config/env';
+import { logger } from '../utils/logger';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+let resendClient: Resend | null = null;
 
-export const sendEmail = async (templateName: string, to: string, ...args: any[]) => {
-  console.log("Templates disponibles:", Object.keys(emailTemplates)); // Ver qué plantillas existen
-  console.log("Template solicitado:", templateName);
+/** Crea el cliente de Resend la primera vez que se necesita (el constructor falla sin API key). */
+const getResend = (): Resend | null => {
+  const apiKey = getResendApiKey();
+  if (!apiKey) return null;
+  if (!resendClient) resendClient = new Resend(apiKey);
+  return resendClient;
+};
 
-  const templateFunction = emailTemplates[templateName as keyof typeof emailTemplates];
-
-  if (!templateFunction) {
-    console.error(`Error: No se encontró la plantilla con el nombre '${templateName}'`);
+/**
+ * Envía un correo usando una plantilla de `emailTemplates`.
+ * Sin RESEND_API_KEY no envía nada: muestra el correo en consola (útil en desarrollo).
+ */
+export const sendEmail = async <T extends EmailTemplateName>(
+  templateName: T,
+  to: string,
+  ...args: Parameters<(typeof emailTemplates)[T]>
+) => {
+  const template = emailTemplates[templateName] as (...a: string[]) => { subject: string; html: string; text: string };
+  if (!template) {
     throw new Error(`Plantilla de email '${templateName}' no encontrada`);
   }
+  const { subject, html, text } = template(...(args as string[]));
 
-  const { subject, html } = templateFunction(...args as [string, string, string]); // Generamos el email con los datos dinámicos
-
-  try {
-    const { data, error } = await resend.emails.send({
-      from: "Soporte <support@magicamente.online>",
-      to,
-      subject,
-      html,
-    });
-
-    if (error) {
-      console.error("Error al enviar el correo:", error);
-      throw new Error("No se pudo enviar el email");
-    }
-
-    console.log("Correo enviado con éxito:", data);
-    return data;
-  } catch (error) {
-    console.error("Error al enviar el correo:", error);
-    throw new Error("Error al enviar el correo");
+  const resend = getResend();
+  if (!resend) {
+    logger.warn(`Email: RESEND_API_KEY no definido; no se envía "${subject}"`); // sin la dirección: son datos personales
+    return null;
   }
+
+  const { data, error } = await resend.emails.send({ from: getEmailFrom(), to, subject, html, text });
+  if (error) {
+    throw new Error(`No se pudo enviar el email: ${error.message}`);
+  }
+  return data;
 };

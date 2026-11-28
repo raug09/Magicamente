@@ -1,51 +1,53 @@
 import { Request, Response } from 'express';
-import { getUserService, updateUserService, deleteUserService, listUsersService } from '../services/userService';
+import {
+  getUserService,
+  getPublicPsychologistService,
+  updateUserService,
+  deleteUserService,
+  listUsersService,
+} from '../services/userService';
+import { AppError } from '../utils/AppError';
+import { setVerificationService } from '../services/verificationService';
 
+/**
+ * Uno mismo y los administradores ven el perfil completo.
+ * El resto solo puede ver el perfil público de un psicólogo.
+ */
 export const getUser = async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
-    const user = await getUserService(id);
-    if (!user) {
-       res.status(404).json({ message: 'Usuario no encontrado' });
-    }
-     res.status(200).json(user);
-  } catch (error: any) {
-     res.status(500).json({ message: error.message || 'Error al obtener el usuario' });
+  const { id } = req.params;
+  const requester = req.user!;
+
+  const canSeeFullProfile = requester.role === 'administrador' || requester.id === id;
+  const user = canSeeFullProfile ? await getUserService(id) : await getPublicPsychologistService(id);
+
+  if (!user) {
+    throw new AppError(404, 'Usuario no encontrado');
   }
+  res.status(200).json(user);
 };
 
 export const updateUser = async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
-    const updateData = req.body;
-    const updatedUser = await updateUserService(id, updateData);
-    if (!updatedUser) {
-       res.status(404).json({ message: 'Usuario no encontrado' });
-    }
-     res.status(200).json(updatedUser);
-  } catch (error: any) {
-     res.status(500).json({ message: error.message || 'Error al actualizar el usuario' });
+  const updatedUser = await updateUserService(req.params.id, req.body, req.user!.role);
+  if (!updatedUser) {
+    throw new AppError(404, 'Usuario no encontrado');
   }
+  res.status(200).json(updatedUser);
 };
 
 export const deleteUser = async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
-    const deletedUser = await deleteUserService(id);
-    if (!deletedUser) {
-       res.status(404).json({ message: 'Usuario no encontrado' });
-    }
-     res.status(200).json({ message: 'Usuario eliminado correctamente' });
-  } catch (error: any) {
-     res.status(500).json({ message: error.message || 'Error al eliminar el usuario' });
+  const deletedUser = await deleteUserService(req.params.id);
+  if (!deletedUser) {
+    throw new AppError(404, 'Usuario no encontrado');
   }
+  res.status(200).json({ message: 'Usuario eliminado correctamente' });
 };
 
 export const listUsers = async (req: Request, res: Response) => {
-  try {
-    const users = await listUsersService();
-     res.status(200).json(users);
-  } catch (error: any) {
-     res.status(500).json({ message: error.message || 'Error al obtener los usuarios' });
-  }
+  res.status(200).json(await listUsersService());
+};
+
+/** Aprobar, rechazar o devolver a pendiente la solicitud de un psicólogo, con la revisión de sus documentos. */
+export const setVerification = async (req: Request, res: Response) => {
+  const user = await setVerificationService(req.params.id, req.body);
+  res.status(200).json(user);
 };

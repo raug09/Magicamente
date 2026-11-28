@@ -1,18 +1,16 @@
 import mongoose from 'mongoose';
-import dotenv from 'dotenv';
+import { describeMongoUri } from './mongoUri';
+import { logger } from '../utils/logger';
 
-dotenv.config();
-
-const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/tu_base_de_datos';
-
-const connectDB = async (): Promise<void> => {
+const connectDB = async (uri: string): Promise<void> => {
   try {
-    await mongoose.connect(MONGO_URI);
-    console.log('Conectado a MongoDB');
+    await mongoose.connect(uri);
   } catch (error) {
-    console.error('Error al conectar a MongoDB:', error);
-    process.exit(1);
+    // Ayuda a encontrar errores de copiado en MONGO_URI sin escribir la contraseña en el log.
+    logger.error({ diagnostico: describeMongoUri(uri) }, 'No se pudo conectar a MongoDB: revisa MONGO_URI (diagnóstico sin contraseña)');
+    throw error;
   }
+  logger.info('Conectado a MongoDB');
 };
 
 export default connectDB;

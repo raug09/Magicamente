@@ -1,0 +1,56 @@
+name: Backend
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: Backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: Backend/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run format:check
+      - run: npm run typecheck
+      - run: npm run build
+      - run: npm test
+
+
+  # Comprueba de extremo a extremo lo que los tests no cubren: que la imagen Docker se construye,
+  # que el servidor arranca de verdad contra una MongoDB real (migraciones incluidas) y responde.
+  docker:
+    runs-on: ubuntu-latest
+    env:
+      JWT_SECRET: ci-only-secret-not-used-anywhere-else
+    steps:
+      - uses: actions/checkout@v4
+      - name: Levantar API + MongoDB
+        run: docker compose up -d --build --wait --wait-timeout 180
+      - name: Comprobar /health y un registro real
+        run: |
+          curl -fsS http://localhost:3000/health
+          echo
+          curl -fsS -X POST http://localhost:3000/api/auth/register \
+            -H 'Content-Type: application/json' \
+            -d '{"name":"CI","email":"ci@example.com","password":"clave-de-ci-123","timezone":"America/Bogota"}'
+          echo
+      - name: Probar el apagado ordenado
+        run: |
+          docker compose stop api
+          docker compose logs api | tail -n 8
+          test "$(docker inspect -f '{{.State.ExitCode}}' "$(docker compose ps -aq api)")" = "0"
+      - name: Logs si algo falla
+        if: failure()
+        run: docker compose logs
+      - name: Limpiar
+        if: always()
+        run: docker compose down -v

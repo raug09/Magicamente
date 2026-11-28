@@ -1,0 +1,229 @@
+# 05 · Manual de uso
+
+## Requisitos
+
+- Node.js 18 o superior (probado con 22) y npm.
+- MongoDB 6+ local, en Docker (`docker run -d -p 27017:27017 mongo:7`) o en MongoDB Atlas.
+- Opcional: una cuenta de [Resend](https://resend.com) con el dominio remitente verificado. Sin ella todo funciona, pero los correos no se envían: aparecen como aviso en la consola.
+
+## Instalación
+
+```bash
+git clone https://github.com/raug09/Magicamente.git
+cd Magicamente/Backend
+npm install
+cp .env.example .env
+```
+
+Edita `Backend/.env`:
+
+| Variable | Obligatoria | Por defecto | Para qué |
+|---|---|---|---|
+| `JWT_SECRET` | **sí** | — (el servidor no arranca sin ella) | Firma de tokens. Usa una cadena larga y aleatoria, p. ej. `node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"` |
+| `MONGO_URI` | recomendable | `mongodb://localhost:27017/magicamente` | Conexión a MongoDB |
+| `PORT` | no | `3000` | Puerto HTTP |
+| `RESEND_API_KEY` | para enviar correos | — | Envío de correo |
+| `EMAIL_FROM` | no | `Soporte <support@magicamente.online>` | Remitente |
+| `APP_TIMEZONE` | no | `UTC` | Zona horaria **por defecto de las cuentas nuevas** (cada usuario puede tener la suya) |
+| `CORS_ORIGIN` | no | solo `FRONTEND_URL` | Orígenes web autorizados (lista separada por comas, o `*`) |
+| `TRUST_PROXY` | detrás de un proxy | sin definir | Nº de proxies delante del servidor (p. ej. `1` en Render, Railway, Heroku o Nginx). **Ponlo si despliegas detrás de un proxy**: si no, el límite de intentos vería la IP del proxy y bloquearía a todos a la vez |
+| `LOG_LEVEL` | no | `info` | `trace`, `debug`, `info`, `warn`, `error`, `fatal` o `silent` |
+| `API_DOCS` | no | activada salvo con `NODE_ENV=production` | `true`/`false`: documentación Swagger en `/api/docs` |
+| `FRONTEND_URL` | para recuperar contraseña | `http://localhost:5173` | URL base del frontend; el correo enlaza a `<FRONTEND_URL>/reset-password?token=...` |
+
+## Ejecución con Docker (API + MongoDB)
+
+No necesitas instalar Node ni MongoDB; solo Docker.
+
+```bash
+cp .env.example .env        # en la RAÍZ del repositorio; rellena al menos JWT_SECRET
+docker compose up --build   # API en http://localhost:3000
+curl http://localhost:3000/health     # {"status":"ok","db":"up"}
+```
+
+- `docker compose up -d` lo deja en segundo plano; `docker compose logs -f api` muestra los logs; `docker compose down` lo para (los datos de MongoDB se conservan en el volumen `mongo-data`; `docker compose down -v` también los borra).
+- MongoDB **no se publica** fuera de Docker: solo la API puede hablar con ella. Para abrir `mongosh`: `docker compose exec mongo mongosh magicamente`.
+- La imagen se ejecuta como usuario no root, tiene un healthcheck (`/health`) y al parar (`docker compose stop`) se apaga de forma ordenada.
+- El `docker-compose.yml` es una base razonable para un servidor propio. Detrás de un proxy (Nginx, Traefik…), pon `TRUST_PROXY=1` y sirve el HTTPS en el proxy.
+
+## Ejecución
+
+```bash
+npm run dev                  # desarrollo con recarga automática
+npm run dev:pretty           # igual, con los logs legibles
+npm run build && npm start   # producción (compila a dist/)
+```
+
+Deberías ver `Conectado a MongoDB` y `Servidor escuchando en el puerto 3000`. Si tenías datos de una versión anterior, el arranque también los migra (citas `cancelled` → `cancelada` y el índice de franjas); verás `[migración] ...` en el log si cambió algo. Si falta `JWT_SECRET`, el proceso termina con `Faltan variables de entorno obligatorias: JWT_SECRET`.
+
+## Tests
+
+```bash
+npm test             # tests de integración
+npm run typecheck    # tipos de src/ y tests/
+npm run lint         # ESLint sobre src/, tests/ y scripts/
+npm run format       # Prettier: formatea todo (el CI falla si algo no está formateado)
+npm run openapi      # regenera docs/openapi.json tras tocar rutas o validaciones
+```
+
+Los tests arrancan una MongoDB en memoria: **no necesitan** tu base de datos ni tu `.env`. La primera vez descargan el binario de MongoDB (~100 MB) desde `fastdl.mongodb.org`, así que hace falta conexión a internet. GitHub Actions los ejecuta en cada push (`.github/workflows/backend.yml`).
+
+## Recorrido completo con `curl`
+
+Usa una fecha futura en `day`.
+
+```bash
+API=http://localhost:3000
+json() { node -pe "JSON.parse(require('fs').readFileSync(0)).$1"; }
+
+# 1. Registrar un psicólogo y un paciente (la zona horaria es opcional; por defecto UTC)
+curl -s -X POST $API/api/auth/register -H 'Content-Type: application/json' \
+  -d '{"name":"Dra. Ana","email":"ana@example.com","password":"secreto123","role":"psicologo","studies":["Clínica"],"timezone":"America/Bogota"}'
+curl -s -X POST $API/api/auth/register -H 'Content-Type: application/json' \
+  -d '{"name":"Luis","email":"luis@example.com","password":"secreto123"}'
+
+# 2. Login de cada uno
+PSI_TOKEN=$(curl -s -X POST $API/api/auth/login -H 'Content-Type: application/json' \
+  -d '{"email":"ana@example.com","password":"secreto123"}' | json token)
+PAC_TOKEN=$(curl -s -X POST $API/api/auth/login -H 'Content-Type: application/json' \
+  -d '{"email":"luis@example.com","password":"secreto123"}' | json token)
+
+# 3. El id del psicólogo (en la práctica, el paciente lo obtiene del listado del paso 5)
+PSI_ID=$(node -pe "JSON.parse(Buffer.from('$PSI_TOKEN'.split('.')[1],'base64url')).id")
+
+# 4. El psicólogo publica una franja (siempre para sí mismo): día y hora en SU zona horaria
+#    (con "repeatWeeks": 8 se repetiría cada semana durante 8 semanas)
+SCHEDULE_ID=$(curl -s -X POST $API/api/schedule -H "Authorization: Bearer $PSI_TOKEN" -H 'Content-Type: application/json' \
+  -d '{"day":"2026-12-15","hour":"10:00"}' | json 'schedules[0]._id')
+
+# 5. El paciente busca psicólogos, y mira las franjas del elegido
+curl -s "$API/api/psychologists?q=ana" -H "Authorization: Bearer $PAC_TOKEN"
+curl -s "$API/api/schedule/$PSI_ID?available=true" -H "Authorization: Bearer $PAC_TOKEN"
+
+# 6. Reservar: solo hace falta el scheduleId
+APPOINTMENT_ID=$(curl -s -X POST $API/api/appointments/appointment -H "Authorization: Bearer $PAC_TOKEN" \
+  -H 'Content-Type: application/json' -d "{\"scheduleId\":\"$SCHEDULE_ID\"}" | json appointment._id)
+
+# 7. Mis citas (paciente o psicólogo)
+curl -s $API/api/appointments/appointment -H "Authorization: Bearer $PAC_TOKEN"
+
+# 8. Cancelar (paciente o psicólogo de la cita); la franja queda libre para reservarse de nuevo
+curl -s -X PATCH $API/api/appointments/appointment/cancel/$APPOINTMENT_ID -H "Authorization: Bearer $PAC_TOKEN"
+
+# 9. Tras la sesión, el psicólogo la marca como completada
+curl -s -X PATCH $API/api/appointments/appointment/update/$APPOINTMENT_ID -H "Authorization: Bearer $PSI_TOKEN" \
+  -H 'Content-Type: application/json' -d '{"state":"completada"}'
+```
+
+## Almacenamiento de documentos (Cloudflare R2)
+
+Los documentos de verificación de los psicólogos (tarjeta profesional, cédula, diploma) se guardan en un bucket **privado** de Cloudflare R2. Sin configurarlo, la subida responde `503` y todo lo demás funciona igual.
+
+**1. En Cloudflare** (panel → R2 Object Storage):
+- Crea un bucket, por ejemplo `magicamente-documentos`, con **acceso público desactivado** (no actives `r2.dev` ni dominio público).
+- Crea una alerta de uso (almacenamiento) en Notificaciones, con un umbral bajo (p. ej. 1 GB).
+- En *Administrar tokens de API de R2*, crea un token de **cuenta** con permiso **Lectura y escritura de objetos** limitado a **ese bucket**. Guarda el *Access Key ID*, el *Secret Access Key* (solo se muestra una vez) y el id de tu cuenta.
+
+**2. En el servidor**, define estas variables (en `Backend/.env` o en el entorno del despliegue; **nunca** en el repositorio):
+
+| Variable | Valor |
+|---|---|
+| `R2_ACCOUNT_ID` | El id de tu cuenta de Cloudflare |
+| `R2_ACCESS_KEY_ID` | Access Key ID del token |
+| `R2_SECRET_ACCESS_KEY` | Secret Access Key del token |
+| `R2_BUCKET` | `magicamente-documentos` |
+
+**Cómo se protegen los archivos:** el bucket no tiene acceso público; los documentos solo se abren con enlaces temporales (5 minutos) que genera el servidor para su dueño o para un administrador, y cada apertura queda registrada. El tipo de archivo se comprueba por su contenido y los nombres de archivo no se usan en las claves. Los documentos de solicitudes rechazadas se borran a los 30 días y los de cuentas eliminadas, al eliminarlas.
+
+**Para probar que R2 funciona de verdad** (los tests automáticos usan un almacenamiento simulado): arranca el backend con las cuatro variables, regístrate como psicólogo y sube un documento con `curl -X PUT $API/api/verification/documents/cedula -H "Authorization: Bearer $TOKEN" -F "file=@cedula.pdf"`; después pide su enlace con `GET /api/verification/documents/cedula/url` y ábrelo.
+
+## Verificar un psicólogo
+
+Un psicólogo nuevo queda `pendiente` y sube sus tres documentos. Como administrador, abre cada uno (`GET /api/users/<id>/verification/documents/<key>/url`), revísalo y decide (para aprobar, los tres archivos deben estar subidos y en `ok`):
+
+```bash
+# Aprobar (los tres documentos deben estar en ok)
+curl -X PUT $API/api/users/<id>/verification -H "Authorization: Bearer $ADMIN_TOKEN" -H 'Content-Type: application/json' \
+  -d '{"status":"aprobado","documents":[{"key":"tarjeta_profesional","status":"ok"},{"key":"cedula","status":"ok"},{"key":"diploma","status":"ok"}]}'
+
+# Rechazar, con motivo y el documento señalado
+curl -X PUT $API/api/users/<id>/verification -H "Authorization: Bearer $ADMIN_TOKEN" -H 'Content-Type: application/json' \
+  -d '{"status":"rechazado","message":"La tarjeta no se lee bien.","documents":[{"key":"tarjeta_profesional","status":"rechazado","note":"Imagen borrosa"}]}'
+```
+
+## Crear el primer administrador
+
+El registro público ya no permite el rol `administrador`. Regístrate como paciente y promuévete a mano en la base de datos:
+
+```js
+// mongosh
+use magicamente
+db.users.updateOne({ email: "admin@example.com" }, { $set: { role: "administrador" } })
+```
+
+Vuelve a hacer login para obtener un token con el rol nuevo. A partir de ahí, ese administrador puede cambiar roles con `PUT /api/users/:id`.
+
+## Recuperar una contraseña
+
+```bash
+# 1. Pedir el enlace (la respuesta es la misma exista o no el email)
+curl -s -X POST $API/api/auth/forgot-password -H 'Content-Type: application/json' -d '{"email":"luis@example.com"}'
+
+# 2. Llega un correo con ...?token=<TOKEN>. Con ese token (válido 1 hora, un solo uso):
+curl -s -X POST $API/api/auth/reset-password -H 'Content-Type: application/json' \
+  -d '{"token":"<TOKEN>","password":"nueva-clave-123"}'
+```
+
+Sin `RESEND_API_KEY` el correo **no se envía** y el token no aparece en ningún log (a propósito), así que para probar el flujo completo hace falta una clave de Resend. Los tests automáticos no la necesitan: interceptan el correo. La contraseña nueva debe tener entre 8 caracteres y 72 bytes, y al restablecerla se cierran las sesiones abiertas.
+
+## Correos
+
+- **Confirmación** al registrarse.
+- **Recuperación de contraseña**: enlace de un solo uso, válido 1 hora.
+- **Recordatorio**: una vez por cita, unas 24 h antes. El cron se ejecuta al minuto 0 de cada hora.
+
+Sin `RESEND_API_KEY` verás en consola `[email] RESEND_API_KEY no definido; no se envía ...`. Si Resend rechaza un envío, revisa la API key y que el dominio de `EMAIL_FROM` esté verificado en tu cuenta.
+
+## Solución de problemas
+
+| Síntoma | Causa probable |
+|---|---|
+| `Faltan variables de entorno obligatorias: JWT_SECRET` | Falta `Backend/.env` o la variable |
+| `No se pudo iniciar el servidor: ... ECONNREFUSED` | `MONGO_URI` incorrecta o Mongo no está arrancado |
+| `400 El enlace no es válido o ha caducado` | El token ya se usó, pasó más de 1 hora, o se pidió un enlace más reciente (invalida el anterior) |
+| No llega el correo de recuperación | Falta `RESEND_API_KEY`, la cuenta está desactivada, o se pidió hace menos de 1 minuto |
+| `400` con `errors: [...]` | La entrada no cumple el esquema; cada elemento indica el `field` y el motivo |
+| `docker compose up` dice que falta `JWT_SECRET` | Crea `.env` en la raíz del repositorio (copia `.env.example`) |
+| `429 Demasiadas peticiones` | Superaste un límite por IP (login: 10 fallos/15 min; registro, forgot y reset: 10/hora; API: 300/15 min). Mira `Retry-After` |
+| `401 La sesión ha caducado: vuelve a iniciar sesión` | Cambiaste o restableciste la contraseña después de emitir ese token |
+| `401 La cuenta no existe o está desactivada` | Cuenta borrada o con `isActive: false` |
+| El frontend recibe error de CORS | Su dirección no coincide con `FRONTEND_URL` ni está en `CORS_ORIGIN` |
+| `401 Token no válido` | El token caducó (1 h) o `JWT_SECRET` cambió desde que se emitió |
+| `403` al editar un usuario | Solo puedes editar tu cuenta, y solo `name`, `description`, `studies`, `password` |
+| `403` al crear un horario | Solo los psicólogos (para sí mismos) o los administradores |
+| `400 La hora ... no existe en ... (cambio de hora)` | Esa hora no existe el día en que el reloj salta hacia delante: elige otra |
+| `409` al modificar o borrar una franja | Tiene una cita reservada: cancélala antes |
+| `409` al reservar | La franja ya está ocupada, o ya tienes otra cita a esa hora |
+| `400` al cancelar | La cita ya no está `pendiente` (ya cancelada o completada) |
+| `npm test` se queda descargando o falla con `fastdl.mongodb.org` | Sin acceso a internet o host bloqueado por la red |
+
+## Si la migración avisa de franjas duplicadas
+
+Al arrancar, la migración intenta crear el índice único de franjas (psicólogo + día + hora). Si ya hay duplicados de una versión anterior, no puede crearlo y lo registra como error (`no se pudo crear el índice único de franjas`). Para limpiarlos, en `mongosh` cuenta los grupos duplicados y borra las franjas sin citas:
+
+```js
+use magicamente
+db.schedules.aggregate([
+  { $group: { _id: { psychologist: "$psychologist", day: "$day", hour: "$hour" }, ids: { $push: "$_id" }, n: { $sum: 1 } } },
+  { $match: { n: { $gt: 1 } } }
+])
+```
+
+Revisa cada grupo antes de borrar: conserva la franja que tenga cita (`db.appointments.findOne({ scheduleId: <id> })`) y borra el resto. Luego reinicia el servidor.
+
+## Probar el envío de correos con Resend
+
+Hay un workflow manual, **Envío real de correos (Resend)** (`.github/workflows/email-smoke.yml`), que se lanza a mano desde Actions → *Run workflow*. **No se ejecuta en cada push**: cada ejecución envía correos de verdad. Necesita el secreto `RESEND_API_KEY` (Settings → Secrets and variables → Actions). Envía las cuatro plantillas a `RESEND_SMOKE_TO` (variable del repositorio; por defecto `delivered@resend.dev`, que descarta el correo) con el remitente `onboarding@resend.dev`, porque el dominio propio tiene que estar verificado en Resend.
+
+Para probarlo en local: `RESEND_API_KEY=… RESEND_SMOKE_TO=tu@correo.com npx ts-node --transpile-only scripts/email-smoke.ts` desde `Backend/`.
+

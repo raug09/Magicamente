@@ -1,15 +1,22 @@
-// routes/schedule.ts
 import { Router } from 'express';
-import { createSchedule, getSchedulesByPsychologist } from '../controllers/scheduleController';
-import { isAuthenticated } from '../middlewares/auth';
-
+import { createSchedule, deleteSchedule, getSchedulesByPsychologist, updateSchedule } from '../controllers/scheduleController';
+import { isAuthenticated, requireRole } from '../middlewares/auth';
+import { asyncHandler } from '../middlewares/asyncHandler';
+import { validate } from '../validation/validate';
+import { createScheduleSchema, listSchedulesQuery, updateScheduleSchema } from '../validation/schemas';
 
 const router = Router();
 
-// Crear un horario (POST /api/schedule)
-router.post('/', isAuthenticated, createSchedule);
+const canManageSchedules = [isAuthenticated, requireRole('psicologo', 'administrador')];
 
-// Obtener todos los horarios de un psicólogo (GET /api/schedule/:psychologistId)
-router.get('/:psychologistId', isAuthenticated, getSchedulesByPsychologist);
+// Crear una franja: solo psicólogos (para sí mismos) o administradores.
+router.post('/', ...canManageSchedules, validate({ body: createScheduleSchema }), asyncHandler(createSchedule));
+
+// Franjas de un psicólogo (filtros: ?available=true&from=&to=): cualquier usuario autenticado.
+router.get('/:psychologistId', isAuthenticated, validate({ query: listSchedulesQuery }), asyncHandler(getSchedulesByPsychologist));
+
+// Modificar o borrar una franja libre: su psicólogo o un administrador.
+router.put('/:id', ...canManageSchedules, validate({ body: updateScheduleSchema }), asyncHandler(updateSchedule));
+router.delete('/:id', ...canManageSchedules, asyncHandler(deleteSchedule));
 
 export default router;

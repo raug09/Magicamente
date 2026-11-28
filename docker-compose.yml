@@ -1,0 +1,43 @@
+# Levanta la API y MongoDB:  docker compose up --build
+# Las variables se leen de un archivo `.env` junto a este docker-compose.yml (ver `.env.example`).
+services:
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    volumes:
+      - mongo-data:/data/db
+    # Sin `ports`: MongoDB solo es accesible desde la red interna de Docker, no desde fuera.
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build: ./Backend
+    init: true
+    restart: unless-stopped
+    depends_on:
+      mongo:
+        condition: service_healthy
+    ports:
+      - "${PORT:-3000}:3000"
+    environment:
+      PORT: "3000"
+      MONGO_URI: mongodb://mongo:27017/magicamente
+      JWT_SECRET: ${JWT_SECRET:?Define JWT_SECRET en un archivo .env junto a este docker-compose.yml}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      EMAIL_FROM: ${EMAIL_FROM:-}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
+      CORS_ORIGIN: ${CORS_ORIGIN:-}
+      APP_TIMEZONE: ${APP_TIMEZONE:-UTC}
+      TRUST_PROXY: ${TRUST_PROXY:-}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      API_DOCS: ${API_DOCS:-}
+      R2_ACCOUNT_ID: ${R2_ACCOUNT_ID:-}
+      R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID:-}
+      R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY:-}
+      R2_BUCKET: ${R2_BUCKET:-}
+
+volumes:
+  mongo-data:

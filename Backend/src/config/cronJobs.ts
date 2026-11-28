@@ -1,55 +1,76 @@
-import cron from "node-cron";
-import Appointment from "../models/appointment"; // Modelo de citas (verifica el nombre)
-import { sendEmail } from "../services/emailService"; // Servicio de envío de correos
-import User from "../models/User"; // Para obtener información del usuario
+import cron from 'node-cron';
+import Appointment from '../models/appointment';
+import User from '../models/User';
+import { sendEmail } from '../services/emailService';
+import { formatAppointmentDate } from '../utils/dates';
+import { logger } from '../utils/logger';
+import { cleanupRejectedDocuments } from '../services/verificationDocumentService';
 
-cron.schedule("* * * * *", async () => {
-  console.log("Ejecutando tarea de recordatorio de citas...");
+const DAY_MS = 24 * 60 * 60 * 1000;
 
-  try {
-    const now = new Date();
-    const tomorrow = new Date(now);
-    tomorrow.setUTCDate(now.getUTCDate() + 1); // Asegurar que se usa UTC para evitar problemas de horario
-    console.log(tomorrow, now);
+export { formatAppointmentDate };
 
-    // Buscar citas que ocurren mañana
-    const appointments = await Appointment.find({
-      time: {
-        $gte: new Date(tomorrow.setHours(0, 0, 0, 0)), // Desde medianoche de mañana
-        $lt: new Date(tomorrow.setHours(23, 59, 59, 999)), // Hasta final del día
-      },
-    });
+/**
+ * Envía un único recordatorio por cita pendiente que empiece en las próximas 24 horas.
+ * Devuelve cuántos correos se enviaron.
+ */
+export const sendAppointmentReminders = async (now = new Date()): Promise<number> => {
+  const candidates = await Appointment.find({
+    state: 'pendiente',
+    reminderSent: { $ne: true },
+    time: { $gt: now, $lte: new Date(now.getTime() + DAY_MS) },
+  }).select('_id');
 
-    if (!appointments.length) {
-      console.log("No hay citas programadas para mañana.");
-      return;
-    }
+  let sent = 0;
+  for (const { _id } of candidates) {
+    // Se "reserva" la cita antes de enviar para no duplicar si dos procesos coinciden.
+    const appointment = await Appointment.findOneAndUpdate({ _id, reminderSent: { $ne: true } }, { reminderSent: true }, { new: true });
+    if (!appointment) continue;
 
-    for (const appointment of appointments) {
-      try {
-        // Verificar si el paciente existe
-        const user = await User.findById(appointment.patientId);
-        if (!user) {
-          console.warn(`No se encontró usuario con ID: ${appointment.patientId}`);
-          continue;
-        }
-
-        const { name, email } = user;
-
-        const appointmentUTC = appointment.time; // Se almacena en UTC
-        console.log("📅 Fecha UTC de la BD:", appointmentUTC);
-        
-        const formattedDate = appointmentUTC.getUTCDate();
-        const formattedHour = appointmentUTC.getUTCHours();
-        
-        // Enviar correo de recordatorio
-        await sendEmail("appointmentReminder", email, name, formattedDate, formattedHour);
-        console.log(`Correo enviado a ${email} para la cita del ${formattedDate} a las ${formattedHour}`);
-      } catch (error) {
-        console.error(`Error al procesar cita ${appointment._id}:`, error);
+    try {
+      const patient = await User.findById(appointment.patientId);
+      if (!patient) {
+        logger.warn({ appointmentId: String(_id), patientId: String(appointment.patientId) }, 'Recordatorios: paciente no encontrado');
+        continue;
       }
+      const { date, hour } = formatAppointmentDate(appointment.time, patient.timezone);
+      await sendEmail('appointmentReminder', patient.email, patient.name, date, hour);
+      sent++;
+    } catch (error) {
+      // Se libera para reintentarlo en la siguiente ejecución.
+      await Appointment.updateOne({ _id }, { reminderSent: false });
+      logger.error({ err: error, appointmentId: String(_id) }, 'Recordatorios: error al procesar la cita');
     }
-  } catch (error) {
-    console.error("Error al ejecutar el cron de recordatorio de citas:", error);
   }
-});
+  return sent;
+};
+
+/** Programa las tareas periódicas. Devuelve un objeto para pararlas al apagar el servidor. */
+export const startCronJobs = () => {
+  // Recordatorios de citas: al minuto 0 de cada hora.
+  const reminders = cron.schedule('0 * * * *', async () => {
+    try {
+      const sent = await sendAppointmentReminders();
+      if (sent > 0) logger.info(`Recordatorios: ${sent} enviado(s)`);
+    } catch (error) {
+      logger.error({ err: error }, 'Recordatorios: error al ejecutar el cron');
+    }
+  });
+
+  // Documentos de solicitudes rechazadas hace más de 30 días: cada noche a las 03:00.
+  const cleanup = cron.schedule('0 3 * * *', async () => {
+    try {
+      const cleaned = await cleanupRejectedDocuments();
+      if (cleaned > 0) logger.info(`Documentos: se limpiaron las solicitudes rechazadas de ${cleaned} psicólogo(s)`);
+    } catch (error) {
+      logger.error({ err: error }, 'Documentos: error al limpiar los rechazados');
+    }
+  });
+
+  return {
+    stop: () => {
+      reminders.stop();
+      cleanup.stop();
+    },
+  };
+};

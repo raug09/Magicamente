@@ -1,65 +1,48 @@
 import { Request, Response } from 'express';
 import * as appointmentService from '../services/appointmentService';
+import { AppError } from '../utils/AppError';
 
-export interface AuthRequest extends Request {
-  user?: {
-    id: string;
-    role: string;
-  };
-}
 export const scheduleAppointment = async (req: Request, res: Response) => {
-  try {
-    const appointment = await appointmentService.scheduleAppointment(req.body);
-    res.status(201).json({ message: 'Appointment scheduled successfully', appointment });
-  } catch (error) {
-    res.status(500).json({ message: 'Error scheduling appointment', error });
-  }
+  const appointment = await appointmentService.scheduleAppointment({
+    patientId: req.user!.id,
+    scheduleId: req.body.scheduleId,
+  });
+  res.status(201).json({ message: 'Cita agendada correctamente', appointment });
 };
 
 export const cancelAppointment = async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
-    const appointment = await appointmentService.cancelAppointment(id);
-    if (!appointment) {
-      res.status(404).json({ message: 'Appointment not found' });
-    }
-    res.status(200).json({ message: 'Appointment canceled successfully', appointment });
-  } catch (error) {
-    res.status(500).json({ message: 'Error canceling appointment', error });
+  const appointment = await appointmentService.cancelAppointment(req.params.id, req.user!);
+  res.status(200).json({ message: 'Cita cancelada correctamente', appointment });
+};
+
+/** Citas del usuario autenticado (paciente o psicólogo), paginadas: ?page=&limit= */
+export const getAppointments = async (req: Request, res: Response) => {
+  const { id, role } = req.user!;
+  const { page, limit } = req.query as unknown as { page: number; limit: number };
+
+  if (role === 'paciente') {
+    res.status(200).json(await appointmentService.getAppointmentsByPatient(id, page, limit));
+  } else if (role === 'psicologo') {
+    res.status(200).json(await appointmentService.getAppointmentsByPsychologist(id, page, limit));
+  } else {
+    throw new AppError(403, 'Solo pacientes y psicólogos tienen citas propias');
   }
 };
-export const getAppointments = async (req: Request, res: Response): Promise<void> => {
-  try {
-    const userId = (req as AuthRequest).user?.id; // ID del usuario autenticado
-    const role = (req as AuthRequest).user?.role; // Rol del usuario
 
-    if (!userId) {
-      res.status(401).json({ message: 'No autorizado' });
-    }
-
-    let appointments;
-
-    if (role === 'patient') {
-      appointments = await appointmentService.getAppointmentsByPatient(userId as string);
-    } else if (role === 'psychologist') {
-      appointments = await appointmentService.getAppointmentsByPsychologist(userId as string);
-    } else {
-      res.status(403).json({ message: 'Acceso no permitido' });
-    }
-
-    res.status(200).json(appointments);
-  } catch (error) {
-    res.status(500).json({ message: 'Error al obtener las citas', error });
-  }
-};
+/** Único cambio de estado permitido aquí: marcar la cita como completada. */
 export const updateAppointment = async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
-    const updateData = req.body;
-
-    const updatedAppointment = await appointmentService.updateAppointment(id, updateData);
-    res.status(200).json({ message: 'Cita actualizada correctamente', updatedAppointment });
-  } catch (error) {
-    res.status(400).json({ message: 'Error al actualizar la cita', error });
+  const body = req.body;
+  const forbidden = Object.keys(body).filter((key) => key !== 'state');
+  if (forbidden.length > 0) {
+    throw new AppError(403, `No puedes modificar: ${forbidden.join(', ')}`);
   }
+  if (body.state === 'cancelada') {
+    throw new AppError(400, 'Para cancelar una cita usa PATCH /appointment/cancel/:id');
+  }
+  if (body.state !== 'completada') {
+    throw new AppError(400, "state debe ser 'completada'");
+  }
+
+  const updatedAppointment = await appointmentService.completeAppointment(req.params.id, req.user!);
+  res.status(200).json({ message: 'Cita actualizada correctamente', updatedAppointment });
 };
