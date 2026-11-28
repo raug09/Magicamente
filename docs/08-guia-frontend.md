@@ -49,14 +49,14 @@ cd Frontend && npm install && npm run dev   # http://localhost:5173
 
 En desarrollo, Vite reenvía `/api` al backend, así que **no hace falta CORS**. El backend solo se necesita configurar para producción (ver abajo).
 
-### Publicar en Cloudflare Pages
+### Publicar en Cloudflare
 
 La guía completa (base de datos, backend y frontend, en orden) está en [09 · Despliegue](09-despliegue.md). Resumen:
 
 - Carpeta raíz: `Frontend` · comando de compilación: `npm run build` · carpeta de salida: `dist`.
 - Variable de compilación: `VITE_API_URL=https://<tu-api>` (la dirección pública del backend).
-- En el backend, `CORS_ORIGIN` debe incluir la dirección de Pages (p. ej. `https://magicamente.pages.dev`), o el navegador bloqueará las peticiones.
-- Las rutas de la app (`/citas`, `/psicologos/...`) necesitan que Pages sirva `index.html` para cualquier ruta. Vite lo gestiona en producción; si al recargar sale un 404, añade un archivo `_redirects` con `/* /index.html 200` en `Frontend/public/`.
+- En el backend, `CORS_ORIGIN` debe incluir la dirección del frontend (p. ej. `https://magicamente.<subdominio>.workers.dev`), o el navegador bloqueará las peticiones.
+- Las rutas de la app (`/citas`, `/psicologos/...`) funcionan al recargar gracias a `not_found_handling: single-page-application` en `Frontend/wrangler.jsonc`. **No añadas un archivo `_redirects` con `/* /index.html 200`**: Cloudflare lo rechaza («Infinite loop detected») y el despliegue falla.
 
 ### Pruebas
 
