@@ -62,7 +62,7 @@ Cloudflare publica ahora los sitios estáticos con su flujo de **Workers** (impo
    - **Variables de compilación** (no las «de ejecución»): `VITE_API_URL` = `https://<tu-servicio>.onrender.com`, sin `/` al final. Vite la incrusta al compilar, así que si la cambias hay que volver a desplegar.
 5. Pulsa **Implementar**. Obtendrás una dirección `https://magicamente.<tu-subdominio>.workers.dev`.
 
-Si no ves la rama de producción al crearlo, está después en **Configuración → Compilaciones → Control de ramas**.
+El formulario de creación no deja elegir la rama (Cloudflare usa la principal y la primera compilación falla con «root directory not found»). Se cambia después en **Configuración → Compilaciones → Rama de producción**. Cambiarla **no lanza** una compilación nueva: hay que reintentar desde **Implementaciones** o subir un cambio a esa rama.
 
 ## 4. Conectar frontend y backend
 
